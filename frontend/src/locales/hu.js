@@ -2422,4 +2422,6 @@ export default {
   'Treadmill, bike, elliptical, stairs and rowing from the Workout app.': 'Futópad, kerékpár, ellipszis tréner, lépcsőzőgép és evezőgép az Edzés appból.',
   'Import from Apple Health now': 'Importálás most az Egészségből',
   'Cardio imported: {0}': 'Importált kardió: {0}',
+  // --- Coach: no connection to the AI provider ---
+  'Couldn’t reach your AI provider. Check your connection and try again.': 'Nem sikerült elérni az MI-szolgáltatódat. Ellenőrizd a kapcsolatot, és próbáld újra.',
 }

@@ -2419,4 +2419,6 @@ export default {
   'Treadmill, bike, elliptical, stairs and rowing from the Workout app.': 'Tapis roulant, bici, ellittica, stepper e vogatore dall’app Allenamento.',
   'Import from Apple Health now': 'Importa ora da Salute',
   'Cardio imported: {0}': 'Cardio importato: {0}',
+  // --- Coach: no connection to the AI provider ---
+  'Couldn’t reach your AI provider. Check your connection and try again.': 'Impossibile raggiungere il tuo provider di IA. Controlla la connessione e riprova.',
 }

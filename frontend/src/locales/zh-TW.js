@@ -2412,4 +2412,6 @@ export default {
   'Treadmill, bike, elliptical, stairs and rowing from the Workout app.': '來自「體能訓練」App 的跑步機、單車、橢圓機、登階機和划船機。',
   'Import from Apple Health now': '立即從「健康」匯入',
   'Cardio imported: {0}': '已匯入有氧：{0}',
+  // --- Coach: no connection to the AI provider ---
+  'Couldn’t reach your AI provider. Check your connection and try again.': '無法連線到你的 AI 服務商。請檢查網路連線後再試一次。',
 }

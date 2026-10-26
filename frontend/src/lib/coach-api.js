@@ -196,8 +196,14 @@ export const BYOK_ERRORS = {
 }
 
 /** The line the person sees for a failed job — with the reason attached where they can act on it. */
+// The provider never answered at all (no network, a dropped connection, a timeout): the same
+// for every provider and nothing in its words to act on, so one plain line instead.
+const UNREACHED = /could not reach|timed out|network|offline|internet|connection/i
+export const NO_CONNECTION = () => t('Couldn’t reach your AI provider. Check your connection and try again.')
+
 export function jobErrorText(cls, detail) {
   const own = LOCAL()
+  if (own && cls === 'provider' && UNREACHED.test(String(detail || ''))) return NO_CONNECTION()
   const base = (own && BYOK_ERRORS[cls]) || JOB_ERRORS[cls] || (own ? BYOK_ERRORS.internal : JOB_ERRORS.internal)
   const why = own && detail ? String(detail).trim().slice(0, 300) : ''
   return why ? `${base}\n${why}` : base

@@ -2430,4 +2430,6 @@ export default {
   'Treadmill, bike, elliptical, stairs and rowing from the Workout app.': 'ลู่วิ่ง จักรยาน อิลลิปติคอล บันได และกรรเชียงจากแอปออกกำลังกาย',
   'Import from Apple Health now': 'นำเข้าจากสุขภาพตอนนี้',
   'Cardio imported: {0}': 'นำเข้าคาร์ดิโอแล้ว: {0}',
+  // --- Coach: no connection to the AI provider ---
+  'Couldn’t reach your AI provider. Check your connection and try again.': 'ติดต่อผู้ให้บริการ AI ไม่ได้ ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง',
 }

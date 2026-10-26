@@ -2416,4 +2416,6 @@ export default {
   'Treadmill, bike, elliptical, stairs and rowing from the Workout app.': 'Бігова доріжка, велотренажер, еліпс, степер і веслування з програми «Тренування».',
   'Import from Apple Health now': 'Імпортувати зі «Здоров’я» зараз',
   'Cardio imported: {0}': 'Імпортовано кардіо: {0}',
+  // --- Coach: no connection to the AI provider ---
+  'Couldn’t reach your AI provider. Check your connection and try again.': 'Не вдалося зв’язатися з вашим ШІ-провайдером. Перевірте з’єднання та спробуйте ще раз.',
 }

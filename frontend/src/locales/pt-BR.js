@@ -1540,6 +1540,8 @@ export const PT_BR_OVERRIDES = {
   'Treadmill, bike, elliptical, stairs and rowing from the Workout app.': 'Esteira, bike, elíptico, escada e remo do app Exercício.',
   'Import from Apple Health now': 'Importar agora do Saúde',
   'Cardio imported: {0}': 'Cardio importado: {0}',
+  // --- Coach: no connection to the AI provider ---
+  'Couldn’t reach your AI provider. Check your connection and try again.': 'Não foi possível falar com seu provedor de IA. Verifique a conexão e tente de novo.',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

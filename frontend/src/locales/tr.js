@@ -2419,4 +2419,6 @@ export default {
   'Treadmill, bike, elliptical, stairs and rowing from the Workout app.': 'Antrenman uygulamasından koşu bandı, bisiklet, eliptik, step ve kürek.',
   'Import from Apple Health now': 'Şimdi Sağlık’tan içe aktar',
   'Cardio imported: {0}': 'İçe aktarılan kardiyo: {0}',
+  // --- Coach: no connection to the AI provider ---
+  'Couldn’t reach your AI provider. Check your connection and try again.': 'Yapay zekâ sağlayıcına ulaşılamadı. Bağlantını kontrol edip tekrar dene.',
 }

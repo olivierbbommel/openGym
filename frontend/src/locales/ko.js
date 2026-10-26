@@ -2419,4 +2419,6 @@ export default {
   'Treadmill, bike, elliptical, stairs and rowing from the Workout app.': '운동 앱의 러닝머신, 자전거, 일립티컬, 스텝밀, 로잉.',
   'Import from Apple Health now': '지금 건강 앱에서 가져오기',
   'Cardio imported: {0}': '가져온 유산소: {0}',
+  // --- Coach: no connection to the AI provider ---
+  'Couldn’t reach your AI provider. Check your connection and try again.': 'AI 제공업체에 연결할 수 없어요. 연결을 확인하고 다시 시도하세요.',
 }

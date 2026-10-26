@@ -66,7 +66,7 @@
 .ob-hint{text-align:center;font-size:13px;color:var(--label-3);margin-top:8px}
 
 /* ---------- chat ---------- */
-.chat{padding-bottom:calc(40px + var(--composer-extra,0px))}
+.chat{padding-bottom:calc(16px + var(--composer-h,120px))}
 .chat-hdr{
   display:flex;align-items:center;gap:10px;
   /* Pinned like a messenger's title bar: it eats the app shell's top padding so the blur
@@ -97,6 +97,7 @@
 .msg.coach .bub{border-bottom-left-radius:6px}
 .msg.user .bub{background:var(--acc);color:var(--on-acc);border-bottom-right-radius:6px}
 .bub.err{background:color-mix(in srgb,var(--red) 14%,var(--surface));color:var(--label)}
+.msg-retry{align-self:flex-start;margin-top:6px}
 .bub.sys{background:none;color:var(--label-2);font-size:13px;text-align:center;padding:4px 8px;align-self:center;max-width:100%}
 .msg.sys{align-self:center;max-width:100%;align-items:center}
 .bub ul{margin:6px 0 0;padding-left:18px}
@@ -159,7 +160,9 @@
 
 /* composer */
 .composer{
-  position:fixed;left:0;right:0;bottom:0;z-index:40;
+  /* Clear of the edges the system keeps (the iPhone Duo's status pill on the right, a sideways
+     phone's notch): the chips and the box never run under them. */
+  position:fixed;left:var(--sal);right:var(--sar);bottom:0;z-index:40;
   padding:8px var(--pad) calc(10px + var(--sab));
   background:color-mix(in srgb,var(--bg) 88%,transparent);
   -webkit-backdrop-filter:saturate(180%) blur(12px);backdrop-filter:saturate(180%) blur(12px)
@@ -167,6 +170,9 @@
 /* The Android app reports the keyboard instead of shrinking the page (lib/native-keyboard.js):
    the composer rides on top of it. */
 :root[data-native-kb] .composer{bottom:var(--native-kb);padding-bottom:10px}
+/* The iPhone's keyboard: the composer sits on it, and the home indicator's strip is under the
+   keys, so its padding would only leave a band between the box and the keyboard. */
+.composer:has(textarea:focus){padding-bottom:8px}
 .composer-in{max-width:560px;margin:0 auto;display:flex;gap:8px;align-items:flex-end;position:relative}
 /* The height is set by components/ChatInput.jsx: as tall as the text, up to 40% of the screen
    above the keyboard, or 70% opened into the tall editor. */
@@ -197,7 +203,7 @@
 
 /* ---------- quick actions above the composer ---------- */
 .chips-row{max-width:560px;margin:0 auto 8px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:0 2px}
-.chips-row::-webkit-scrollbar{display:none}
+
 .qchip{
   flex:none;display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:99px;
   background:var(--surface);color:var(--label);font-size:13px;font-weight:500;letter-spacing:-.006em;

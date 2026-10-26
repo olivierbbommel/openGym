@@ -30,7 +30,7 @@ import {
   changeTitle, changeValues, exName, canRevert, revertLast
 } from '../lib/coach.js'
 import { insightsFor, sessionInsights } from '../lib/coach-insights.js'
-import { useCoachStatus, requestReview, requestDebrief, requestPlan, refinePlan, resolvePending, cohortStats, setCohortShare, jobErrorText, awaitedJob, settleAwaited, JOB_ERRORS, ensureAiConsent, isDeclined } from '../lib/coach-api.js'
+import { useCoachStatus, requestReview, requestDebrief, requestPlan, refinePlan, resolvePending, cohortStats, setCohortShare, jobErrorText, NO_CONNECTION, awaitedJob, settleAwaited, JOB_ERRORS, ensureAiConsent, isDeclined } from '../lib/coach-api.js'
 import { AiConsentSection } from '../components/CoachConsentSheet.jsx'
 import { useCoachGate } from '../lib/use-coach-gate.js'
 import { confirmSheet } from '../sheets.jsx'
@@ -57,6 +57,10 @@ export default function CoachChat() {
   const [busy, setBusy] = useState(false)
   const endRef = useRef(null)
   const prevJob = useRef(null)
+  const chatRef = useRef(null)
+  const composerRef = useRef(null)
+  // The last question asked, to ask again from a failed answer's Try again (this session only).
+  const lastAsk = useRef(null)
   const coachMode = coachLocal?.mode
 
   const gate = useCoachGate()
@@ -103,6 +107,32 @@ export default function CoachChat() {
 
   useEffect(() => { if (typeof endRef.current?.scrollIntoView === 'function') endRef.current.scrollIntoView({ block: 'end' }) }, [S.coach?.chat?.length, !!job, !!pending])
 
+  // The thread ends above the composer, however tall it is (chips, a grown message, the line of
+  // runs used): its real height goes to the page's bottom padding. When it grows, or the
+  // keyboard comes up, the last message is scrolled back into view.
+  useEffect(() => {
+    const el = composerRef.current, chat = chatRef.current
+    if (!el || !chat) return
+    const toEnd = () => { if (typeof endRef.current?.scrollIntoView === 'function') endRef.current.scrollIntoView({ block: 'end' }) }
+    let last = 0
+    const measure = () => {
+      const h = Math.round(el.getBoundingClientRect().height)
+      if (h === last) return
+      const grew = h > last
+      last = h
+      chat.style.setProperty('--composer-h', h + 'px')
+      if (grew) requestAnimationFrame(toEnd)
+    }
+    measure()
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null
+    ro?.observe(el)
+    const vv = window.visualViewport
+    const onKb = () => setTimeout(toEnd, 50)
+    vv?.addEventListener('resize', onKb)
+    return () => { ro?.disconnect(); vv?.removeEventListener('resize', onKb) }
+  })
+
+
   if (!ready) return null
   const coach = S.coach || emptyCoach()
   const community = !!config?.coach?.community && !DEMO && !(MOBILE && coachMode === 'byok')
@@ -115,8 +145,9 @@ export default function CoachChat() {
       // A message about a proposed plan refines it. With no plan at all — the first attempt
       // failed, or nothing was ever built — the message asks for one; a review would only
       // answer that there is no workout to look at, which is how people got stuck.
-      if (pending?.kind === 'create' || !(S.routines || []).length) await refinePlan(msg)
-      else await requestReview(msg)
+      const again = pending?.kind === 'create' || !(S.routines || []).length ? () => refinePlan(msg) : () => requestReview(msg)
+      lastAsk.current = again
+      await again()
       update(s => appendChat(s, { role: 'user', kind: 'text', text: msg }))
       setText('')
       setExpanded(false)
@@ -133,10 +164,18 @@ export default function CoachChat() {
   const ask = async (fn, line) => {
     setBusy(true)
     try {
+      lastAsk.current = fn
       await fn()
       update(s => appendChat(s, { role: 'user', kind: 'text', text: line }))
       refresh()
     } catch (e) { if (!isDeclined(e)) toast(JOB_ERRORS[e.data?.code] || e.message || t('Could not ask the Coach')) }
+    setBusy(false)
+  }
+  // A failed answer's Try again: the same question once more, without writing it into the thread twice.
+  const retry = async () => {
+    if (!lastAsk.current || busy || job) return
+    setBusy(true)
+    try { await lastAsk.current(); refresh() } catch (e) { if (!isDeclined(e)) toast(JOB_ERRORS[e.data?.code] || e.message || t('Could not ask the Coach')) }
     setBusy(false)
   }
   const askReview = () => ask(() => requestReview(''), t('Have a look at my training and tell me what you would change.'))
@@ -195,7 +234,9 @@ export default function CoachChat() {
     ? t('What should change?')
     : job ? t('Coach is thinking…') : t('Message the Coach…')
 
-  return <div className="narrow chat">
+  const chat = coach.chat || []
+  const lastErr = chat.length && chat[chat.length - 1].kind === 'error' ? chat[chat.length - 1].id : null
+  return <div className="narrow chat" ref={chatRef}>
     <div className="chat-hdr">
       <button className="iconbtn" data-back="/plan" onClick={() => nav('/plan')} aria-label={t('Back')}><Icon name="chevronLeft" /></button>
       <div className="chat-av"><Icon name="sparkles" /></div>
@@ -209,7 +250,8 @@ export default function CoachChat() {
     <div className="msgs">
       <Bubble role="coach">{t('Hi, I’m your Coach. I build your plan from your answers and adjust it from what you actually log. Nothing changes until you say so.')}</Bubble>
 
-      {(coach.chat || []).map(m => <Message key={m.id} m={m} S={S} profile={coach.profile} openSheet={openSheet} />)}
+      {chat.map(m => <Message key={m.id} m={m} S={S} profile={coach.profile} openSheet={openSheet}
+        onRetry={m.id === lastErr && lastAsk.current && !job && !busy ? retry : null} />)}
 
       {job && <Typing S={S} kind={job.kind} coachLocal={coachLocal} config={config} />}
 
@@ -222,7 +264,7 @@ export default function CoachChat() {
       <div ref={endRef} />
     </div>
 
-    <div className="composer">
+    <div className="composer" ref={composerRef}>
       {idle && !busy && <div className="chips-row">
         <button className="qchip" onClick={askReview}><Icon name="sparkles" />{t('Review my training')}</button>
         {!!lastWorkout && <button className="qchip" onClick={askDebrief}><Icon name="checkCircle" />{t('Last workout')}</button>}
@@ -241,15 +283,16 @@ export default function CoachChat() {
 
 /* ---------------------------------- bubbles ---------------------------------- */
 
-function Bubble({ role, kind, at, children }) {
+function Bubble({ role, kind, at, onRetry, children }) {
   const cls = kind === 'error' ? ' err' : ''
   return <div className={'msg ' + role}>
     <div className={'bub' + cls}>{children}</div>
+    {onRetry && <button className="qchip msg-retry" onClick={onRetry}><Icon name="refresh" />{t('Try again')}</button>}
     {at && <div className="msg-t">{stamp(at)}</div>}
   </div>
 }
 
-function Message({ m, S, profile, openSheet }) {
+function Message({ m, S, profile, openSheet, onRetry }) {
   if (m.kind === 'intake') {
     const lines = profileLines(profile)
     return <Bubble role="user" at={m.at}>
@@ -266,7 +309,9 @@ function Message({ m, S, profile, openSheet }) {
     </div>
   }
   if (m.kind === 'reverted' || m.kind === 'nochange' || m.kind === 'error' || m.kind === 'text') {
-    return <Bubble role={m.role} kind={m.kind} at={m.at}>{m.text}</Bubble>
+    // An older "could not reach" failure, kept in the thread with the provider's raw words: shown in plain ones.
+    const text = m.kind === 'error' && /could not reach|network connection/i.test(m.text || '') ? NO_CONNECTION() : m.text
+    return <Bubble role={m.role} kind={m.kind} at={m.at} onRetry={m.kind === 'error' ? onRetry : null}>{text}</Bubble>
   }
   return null
 }

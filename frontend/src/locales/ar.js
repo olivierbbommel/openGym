@@ -2474,4 +2474,6 @@ export default {
   'Treadmill, bike, elliptical, stairs and rowing from the Workout app.': 'جهاز المشي والدراجة والإهليلجي والدرج والتجديف من تطبيق التمرين.',
   'Import from Apple Health now': 'استيراد الآن من صحتي',
   'Cardio imported: {0}': 'تم استيراد الكارديو: {0}',
+  // --- Coach: no connection to the AI provider ---
+  'Couldn’t reach your AI provider. Check your connection and try again.': 'تعذّر الوصول إلى مزوّد الذكاء الاصطناعي. تحقّق من اتصالك وحاول مرة أخرى.',
 }

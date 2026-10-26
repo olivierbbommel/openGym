@@ -2419,4 +2419,6 @@ export default {
   'Treadmill, bike, elliptical, stairs and rowing from the Workout app.': 'वर्कआउट ऐप से ट्रेडमिल, बाइक, एलिप्टिकल, सीढ़ी और रोइंग।',
   'Import from Apple Health now': 'अभी हेल्थ से आयात करें',
   'Cardio imported: {0}': 'कार्डियो आयात हुआ: {0}',
+  // --- Coach: no connection to the AI provider ---
+  'Couldn’t reach your AI provider. Check your connection and try again.': 'आपके AI प्रदाता तक नहीं पहुँच सके। अपना कनेक्शन जाँचें और फिर से कोशिश करें।',
 }
