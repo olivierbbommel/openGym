@@ -46,6 +46,10 @@ sed -i '' -e 's/Text(verbatim: "openGym")/Text(verbatim: "OliGym")/g' -e 's/conf
   -e 's/description("Opens openGym\.")/description("Opens OliGym.")/g' "$IOS/App/WatchWidgets/OpenGymWidgets.swift"
 sed -i '' 's/mode: "idle", title: "openGym"/mode: "idle", title: "OliGym"/' "$IOS/App/Watch/WidgetState.swift"
 
+# The app's own title where it says its name (Home without a profile, the first launch, sign-in).
+sed -i '' "s/ : 'openGym'}<\/h1>/ : 'OliGym'}<\/h1>/" frontend/src/views/Home.jsx
+sed -i '' "s/margin: '10px 0 4px' }}>openGym<\/h1>/margin: '10px 0 4px' }}>OliGym<\/h1>/" frontend/src/views/Login.jsx frontend/src/views/MobileOnboarding.jsx
+
 # Edit the line after the key in place (plutil -replace would re-sort the whole file).
 for p in App Watch OpenGymWidgets WatchWidgets; do
   sed -i '' '/<key>CFBundleDisplayName<\/key>/{n;s|<string>.*</string>|<string>OliGym</string>|;}' "$IOS/App/$p/Info.plist"
