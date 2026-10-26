@@ -104,4 +104,90 @@ final class PhoneAtHomeTests: XCTestCase {
         s = SessionCore.applySnapshot(s, snap(workout("p1", [row(60, 8), row(60, 8), row(60, 8)])))
         XCTAssertEqual(s.workout?.entries[0].sets.count, 2)
     }
+
+    /* ---------- exercises added and swapped ---------- */
+
+    func entry(_ id: String, _ sets: [SetRow], group: String? = nil) -> Entry {
+        var e = Entry(id: id, name: id, mode: "reps", restSec: nil, last: nil, sets: sets)
+        e.group = group
+        return e
+    }
+
+    func testThePickListHasTheRoutinesExercisesThenThePhonesOthersEachOnceNotDoneNoCardio() {
+        var s = SessionState()
+        s.ready = Ready(today: ReadySession(routineIds: ["r1"], name: "Push", entries: [entry("0025", [row(60, 8, done: true, at: 1)])]),
+                        others: [ReadySession(routineIds: ["r2"], name: "Pull", entries: [entry("0025", [row(1, 1)]), entry("pull", [row(0, 8)])])])
+        var cardio = entry("run", [row(0, 0)])
+        cardio.mode = "cardio"
+        s.catalog = ExerciseCatalog(recent: ["fly", "pull"], parts: ["0025": "Chest", "fly": "Chest"], extra: [entry("fly", [row(12, 12)]), cardio])
+        let p = SessionCore.picks(s)
+        XCTAssertEqual(p.map(\.id), ["0025", "pull", "fly"])
+        XCTAssertEqual(p[0].entry.sets[0].done, false, "as it would start")
+        XCTAssertEqual(p[0].entry.sets[0].w, 60)
+        XCTAssertEqual(p[0].part, "Chest")
+        XCTAssertEqual(p[2].recent, 0)
+        XCTAssertEqual(p[1].recent, 1)
+    }
+
+    func testAnAddedExerciseGoesAfterTheOneOnScreenAndItsSupersetAndIsUpNext() {
+        var s0 = SessionState()
+        s0.workout = ActiveWorkout(id: "p1", name: "Push", unit: "kg", cur: 0, restSec: 90, rest: nil,
+                                   entries: [entry("a", [row(1, 1)], group: "g"), entry("b", [row(1, 1)], group: "g"), entry("c", [row(1, 1)])])
+        let (s, ev) = SessionCore.addExercise(s0, entry("fly", [row(12, 12, done: true, at: 5)]), at: 10, id: "x1")
+        XCTAssertEqual(s.workout?.entries.map(\.id), ["a", "b", "fly", "c"])
+        XCTAssertEqual(s.entryIndex, 2)
+        XCTAssertEqual(s.workout?.entries[2].sets[0].done, false)
+        XCTAssertNil(s.workout?.entries[2].group)
+        XCTAssertEqual(ev?["type"] as? String, "addExercise")
+        XCTAssertEqual(ev?["index"] as? Int, 2)
+        // from the Finish page: at the end
+        var f = s0
+        f.entryIndex = 3
+        XCTAssertEqual(SessionCore.addExercise(f, entry("fly", [row(1, 1)]), at: 1, id: "x2").0.workout?.entries.last?.id, "fly")
+    }
+
+    func testASwapReplacesAnExerciseWithNothingDoneWhereItIsInItsSuperset() {
+        var s0 = running([row(60, 8), row(60, 8)])
+        s0 = SessionCore.skip(s0, entry: 0, set: 0)
+        var w = s0.workout!
+        w.entries[0].group = "g"
+        s0.workout = w
+        let (s, ev) = SessionCore.swapExercise(s0, entry: 0, to: entry("db-bench", [row(24, 10)]), at: 10, id: "s1")
+        XCTAssertEqual(s.workout?.entries.map(\.id), ["db-bench", "0426"])
+        XCTAssertEqual(s.workout?.entries[0].group, "g")
+        XCTAssertNil(s.skipped?.first { $0.hasPrefix("0025#") })
+        XCTAssertEqual(ev?["to"] as? String, "db-bench")
+        XCTAssertEqual(ev?["index"] as? Int, 0)
+    }
+
+    func testASwapAfterASetWasDoneKeepsItAndPutsTheNewOneRightAfterAsThePhoneDoes() {
+        let s0 = running([row(60, 8, done: true, at: 1), row(60, 8)])
+        let (s, ev) = SessionCore.swapExercise(s0, entry: 0, to: entry("db-bench", [row(24, 10)]), at: 10, id: "s1")
+        XCTAssertEqual(s.workout?.entries.map(\.id), ["0025", "db-bench", "0426"])
+        XCTAssertEqual(s.entryIndex, 1)
+        XCTAssertEqual(ev?["index"] as? Int, 1)
+        XCTAssertNil(SessionCore.swapExercise(s0, entry: 0, to: entry("0025", []), at: 1, id: "s2").1, "not for itself")
+    }
+
+    func testAddedAndSwappedExercisesStayOverOlderSnapshotsAndTheirTicksToo() {
+        var s = running([row(60, 8, done: true, at: 1), row(60, 8)])
+        s.entryIndex = 1
+        s = SessionCore.addExercise(s, entry("fly", [row(12, 12)]), at: 10, id: "x1").0
+        s = SessionCore.tick(s, entry: 2, set: 0, w: 12, r: 12, at: 20, id: "t1").0
+        s = SessionCore.swapExercise(s, entry: 0, to: entry("db-bench", [row(24, 10)]), at: 30, id: "s1").0
+        let before = s.workout?.entries.map(\.id)
+        XCTAssertEqual(before, ["0025", "db-bench", "0426", "fly"])
+        // the phone has applied none of it yet
+        s = SessionCore.applySnapshot(s, snap(workout("p1", [row(60, 8, done: true, at: 1), row(60, 8)])))
+        XCTAssertEqual(s.workout?.entries.map(\.id), before)
+        XCTAssertEqual(s.workout?.entries[3].sets[0].done, true, "the tick on the added exercise holds")
+        // all applied: the phone's copy as it is
+        var phone = workout("p1", [row(60, 8, done: true, at: 1), row(60, 8)])
+        phone.entries.insert(entry("db-bench", [row(24, 10)]), at: 1)
+        phone.entries.append(entry("fly", [row(12, 12, done: true, at: 20)]))
+        s = SessionCore.applySnapshot(s, snap(phone, applied: ["x1", "t1", "s1"]))
+        XCTAssertEqual(s.workout?.entries.map(\.id), before)
+        XCTAssertNil(s.edits)
+    }
 }
+

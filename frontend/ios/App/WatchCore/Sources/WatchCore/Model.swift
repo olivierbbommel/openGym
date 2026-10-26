@@ -19,6 +19,28 @@ struct Snapshot: Codable, Equatable {
     /// The ids of the watch's events the phone applied lately: the watch stops laying those of its
     /// own changes over the snapshot (SessionCore.applySnapshot). A phone that sends none knows none.
     var applied: [String]?
+    /// What can be added to a session or swapped in besides the ready routines' exercises.
+    var exercises: ExerciseCatalog?
+}
+
+/// The exercises the watch can add or swap in with the phone at home (frontend buildExercises):
+/// those of the ready routines (taken from `ready`), and these beside them.
+struct ExerciseCatalog: Codable, Equatable {
+    /// Done lately, newest first.
+    var recent: [String]?
+    /// The body part of each, in the app's words, for the list's sections.
+    var parts: [String: String]?
+    /// Done lately or made by the lifter, but in no ready routine: each with last time's sets.
+    var extra: [Entry]?
+}
+
+/// One exercise in the watch's list to add or swap in: as it would start (its rows not done).
+struct Pick: Equatable, Identifiable {
+    var entry: Entry
+    var part: String
+    /// Its place among the recent ones (0 the latest), or nil.
+    var recent: Int?
+    var id: String { entry.id }
 }
 
 /// What the watch can start by itself: today's planned session and a few other routines.

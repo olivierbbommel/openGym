@@ -15,11 +15,11 @@
 // The iPhone app only. Without a paired watch with the app on it, nothing is sent and nothing
 // arrives: the phone behaves exactly as before.
 import { MOBILE, nativePlatform } from './mobile.js'
-import { EXIDX, gifSrc, figureOf, isAssisted } from './exercises.js'
+import { EXIDX, gifSrc, figureOf, isAssisted, isCardio as isCardioEx } from './exercises.js'
 import { packId, packDrawingId } from './anim-quality.js'
 import { getState as animPacks } from './anim-packs.js'
-import { exerciseNameFor, getLang, baseLang, onLangChange } from './i18n.js'
-import { modeOf, setLabel, lastEntryFor, effectiveRoutineIds, isBw, isPerSide } from './history.js'
+import { t, exerciseNameFor, getLang, baseLang, onLangChange } from './i18n.js'
+import { modeOf, setLabel, lastEntryFor, effectiveRoutineIds, isBw, isPerSide, freestyleConfig, defaultConfig } from './history.js'
 import { isWarmupRow, isSideSet, syncSideAggregate } from './workout-model.js'
 import { bestSetFor } from './exercise-history.js'
 import { weightIncrement } from './progression.js'
@@ -127,6 +127,53 @@ export function buildReady (S, today = todayISO()) {
   const planned = todayIds.length ? session(todayIds) : null
   const others = (S.routines || []).filter(r => r && !todayIds.includes(r.id)).slice(0, READY_MAX).map(r => session([r.id])).filter(Boolean)
   return { today: planned, others }
+}
+
+// The body parts as the app names them (views/CoachChat.jsx), for the watch's exercise list.
+const BP_LABEL = { back: 'Back muscles', cardio: 'Cardio', chest: 'Chest', 'lower arms': 'Forearms', 'lower legs': 'Calves', neck: 'Neck', shoulders: 'Shoulders', 'upper arms': 'Arms', 'upper legs': 'Legs', waist: 'Core', other: 'Other' }
+const partOf = id => { const bp = EXIDX[id]?.bp || 'other'; try { return t(BP_LABEL[bp] || bp) } catch { return BP_LABEL[bp] || bp } }
+// Exercises the watch can add or swap in besides those of the ready routines, and how many recent ones it names.
+export const EXTRA_MAX = 25
+export const RECENT_MAX = 25
+
+// A row as it is up next: the numbers kept, nothing done.
+const fresh = s => (isSideSet(s)
+  ? { ...s, done: false, at: undefined, sides: { L: { ...s.sides.L, done: false }, R: { ...s.sides.R, done: false } } }
+  : { ...s, done: false, at: undefined })
+
+/**
+ * What the watch can add to a session, or swap an exercise for, with the phone at home: every
+ * exercise of the ready routines (the watch takes those from `ready`, as they would be built
+ * there), plus the ones done lately or made by the lifter that no routine has (`extra`, each with
+ * last time's work sets, or the phone's defaults for a new one). `recent` names the latest done,
+ * newest first; `parts` the body part of each, for the watch's list. Cardio stays out: the watch
+ * leaves it to the phone.
+ */
+export function buildExercises (S, ready) {
+  let H = null
+  try { H = sessionHistory(S) } catch { H = S }
+  const fromReady = [...(ready?.today?.entries || []), ...(ready?.others || []).flatMap(r => r.entries || [])].map(e => e.id)
+  const recent = []
+  const byNewest = [...(S?.workouts || [])].filter(w => w && Array.isArray(w.entries)).sort((a, b) => String(b.d || '').localeCompare(String(a.d || '')))
+  for (const w of byNewest) {
+    for (const e of w.entries) if (e?.id && !isCardioEx(e.id) && !recent.includes(e.id)) recent.push(e.id)
+    if (recent.length >= RECENT_MAX) break
+  }
+  const custom = (S?.customEx || []).map(x => x && x.id).filter(id => typeof id === 'string' && !isCardioEx(id))
+  const extraIds = [...new Set([...recent, ...custom])].filter(id => !fromReady.includes(id)).slice(0, EXTRA_MAX)
+  const extra = []
+  for (const id of extraIds) {
+    try {
+      const cfg = { ...freestyleConfig(H, { id, ...defaultConfig(id) }), id }
+      const last = lastEntryFor(H, id)
+      const work = last && Array.isArray(last.sets) ? last.sets.filter(s => s && !isWarmupRow(s)).map(fresh) : []
+      const rows = work.length ? work : Array.from({ length: Math.max(1, cfg.sets || 3) }, () => ({ w: num(cfg.weight) || 0, r: num(cfg.reps), sec: num(cfg.sec), done: false }))
+      extra.push(watchEntry({ id, target: cfg, sets: rows }, H, S))
+    } catch { /* an exercise that no longer exists: left out */ }
+  }
+  const parts = {}
+  for (const id of [...fromReady, ...extra.map(e => e.id)]) if (!parts[id]) parts[id] = partOf(id)
+  return { recent: recent.slice(0, RECENT_MAX), parts, extra }
 }
 
 /** What the watch needs to run the session: plain data, no media (licence: text only). */
@@ -254,6 +301,9 @@ function entryIndexOf (A, ev) {
  *   setHr   { wid, exId, entryIdx, setIdx, hr?, restHr? }   heart rate on a set (lib/heart-rate.js)
  *   addSet    { wid, exId, entryIdx, rows }            the workout screen's own Add set
  *   removeSet { wid, exId, entryIdx, setIdx, rows }    its own remove, a set not done only
+ *   addExercise  { wid, exId, index, rows }            its own Add exercise (quick add), at `index`
+ *   swapExercise { wid, exId, entryIdx, to, rows }     its own Swap exercise to `to`; a swap of
+ *                                                      one with logged sets inserts beside it
  *
  * `rows` are the exercise's sets as the watch has them after the change, which the phone's own
  * change is evened out with (alignToWatchRows). The snapshot names the events applied lately
@@ -310,6 +360,20 @@ export function applyEvents (events, getState) {
       const rows = rowsOf(ev.rows)
       if (idx >= 0 && ev.type === 'addSet' && handlers.addSet) handlers.addSet(idx, rows)
       if (idx >= 0 && ev.type === 'removeSet' && handlers.removeSet && Number.isInteger(ev.setIdx)) handlers.removeSet(idx, ev.setIdx, rows)
+    } else if ((ev.type === 'addExercise' || ev.type === 'swapExercise') && ours) {
+      // An exercise added or swapped at the wrist: the workout screen's own add and swap, built as
+      // a quick add from the phone's picker builds it, then its rows evened out with the watch's.
+      if (!handlers) {
+        if (appHandlers?.openWorkout) appHandlers.openWorkout()
+        break
+      }
+      const rows = rowsOf(ev.rows)
+      const at = Number.isInteger(ev.index) ? Math.max(0, Math.min(A.entries.length, ev.index)) : A.entries.length
+      if (ev.type === 'addExercise' && typeof ev.exId === 'string' && handlers.addExercise) handlers.addExercise(ev.exId, at, rows)
+      if (ev.type === 'swapExercise' && typeof ev.to === 'string' && handlers.swapExercise) {
+        const idx = entryIndexOf(A, ev)
+        if (idx >= 0) handlers.swapExercise(idx, ev.to, rows)
+      }
     } else if (ev.type === 'weighIn') {
       // The weigh-in the watch asks for before a workout it starts: a body weight entry on its
       // day, as the phone's own check-in makes one (today's replaces today's).
@@ -436,8 +500,8 @@ const bytesOf = v => new TextEncoder().encode(typeof v === 'string' ? v : JSON.s
 
 /**
  * The snapshot made small enough to send, dropping first what matters least: the "last time" lines
- * of the routines the watch could start, then those routines but today's (down to a dozen, three,
- * none), then today's own "last
+ * of the exercises the watch could add and of the routines it could start, then those exercises
+ * and routines (down to a dozen, three, none), then today's own "last
  * time" lines and records, then the "last time" of the running workout, then what is ready
  * altogether. The running workout's sets are never cut: without them the watch has nothing to do.
  */
@@ -446,13 +510,16 @@ export function fitSnapshot (snap, max = SNAPSHOT_MAX_BYTES) {
   const out = JSON.parse(JSON.stringify(snap))
   const strip = (entries, ...keys) => { for (const e of entries || []) for (const k of keys) delete e[k] }
   const steps = [
+    () => strip(out.exercises?.extra, 'last', 'best'),
     () => { for (const r of out.ready?.others || []) strip(r.entries, 'last', 'best') },
+    () => { if (out.exercises) out.exercises.extra = (out.exercises.extra || []).slice(0, 10) },
     () => { if (out.ready) out.ready.others = (out.ready.others || []).slice(0, 12) },
     () => { if (out.ready) out.ready.others = (out.ready.others || []).slice(0, 3) },
+    () => { if (out.exercises) out.exercises.extra = [] },
     () => { if (out.ready) out.ready.others = [] },
     () => { if (out.ready?.today) strip(out.ready.today.entries, 'last', 'best') },
     () => { if (out.active) strip(out.active.entries, 'last') },
-    () => { out.ready = null },
+    () => { out.ready = null; delete out.exercises },
     () => { if (out.active) strip(out.active.entries, 'best') },
   ]
   for (const step of steps) {
@@ -502,12 +569,13 @@ export async function startWatchSync ({ useStore, useUI }) {
   getStateRef = () => useStore.getState()
   let lastSent = null, lastClips = null, tm = null
   // The ready sessions only change with the plan, the log or the day: built again only then.
-  let readyKey = null, ready = null
+  let readyKey = null, ready = null, exercises = null
   const readyFor = S => {
-    const key = [S.routines, S.week, S.dayPlan, S.workouts, S.exWeights, S.unit, todayISO()]
+    const key = [S.routines, S.week, S.dayPlan, S.workouts, S.exWeights, S.unit, S.customEx, todayISO()]
     if (!readyKey || key.some((v, i) => v !== readyKey[i])) {
       readyKey = key
       try { ready = buildReady(S) } catch { ready = null }
+      try { exercises = buildExercises(S, ready) } catch { exercises = null }
     }
     return ready
   }
@@ -540,6 +608,8 @@ export async function startWatchSync ({ useStore, useUI }) {
       snap.settings = { ...settingsForWatch(prefs, healthOn), ...watchExtras(S) }
       // The watch's own changes the phone has applied: the watch stops laying them over the snapshot.
       if (prefs.enabled) snap.applied = recentlyApplied()
+      // What the watch can add or swap in, the phone at home (built with the ready routines).
+      if (prefs.enabled && exercises) snap.exercises = exercises
       // With Apple Health on: the deleted workouts, so the watch removes the copies it saved.
       if (healthOn) { const gone = healthGoneFor(S); if (gone.length) snap.healthGone = gone }
       const json = JSON.stringify(fitSnapshot(snap))

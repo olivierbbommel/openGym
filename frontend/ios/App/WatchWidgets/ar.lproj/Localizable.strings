@@ -30,7 +30,11 @@
 "More" = "أكثر";
 "Add set" = "إضافة مجموعة";
 "Remove set" = "إزالة المجموعة";
+"Add exercise" = "إضافة تمرين";
+"Swap exercise" = "استبدال التمرين";
+"Search…" = "بحث…";
 "Last time: %@" = "المرة السابقة: %@";
+"Recent" = "الأخيرة";
 "No workout running" = "لا يوجد تمرين جارٍ";
 "Start one on your iPhone and it shows up here." = "ابدأ تمرينًا على iPhone وسيظهر هنا.";
 "All sets done" = "اكتملت كل المجموعات";

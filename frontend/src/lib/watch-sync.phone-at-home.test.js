@@ -3,7 +3,10 @@
 // changed at the wrist, a workout started empty. The snapshot carries what that needs and still
 // fits; the watch's changes come back as events the workout screen applies with its own actions.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { buildReady, buildSnapshot, fitSnapshot, READY_MAX, SNAPSHOT_MAX_BYTES, _resetWatchSync, applyEvents, bindWatchActions, alignToWatchRows, recentlyApplied } from './watch-sync.js'
+import { buildReady, buildSnapshot, buildExercises, fitSnapshot, READY_MAX, SNAPSHOT_MAX_BYTES, EXTRA_MAX, _resetWatchSync, applyEvents, bindWatchActions, alignToWatchRows, recentlyApplied } from './watch-sync.js'
+import { swapActiveExercise } from './active-exercise-swap.js'
+import { buildCompletedWorkout } from './finish-workout.js'
+import { bestWeightForEntry } from './history.js'
 import { EXDB } from './exercises-data.js'
 
 const bytes = v => new TextEncoder().encode(JSON.stringify(v)).length
@@ -92,5 +95,80 @@ describe('a set added or removed at the wrist', () => {
     expect(alignToWatchRows([{ w: 2, r: 2, done: true }], [])).toEqual([{ w: 2, r: 2, done: true }])
     // a copy of a ticked row comes back not done, without its tick time or heart rate
     expect(alignToWatchRows([{ w: 50, r: 5, done: true, at: 9, hr: { avg: 120 } }], [{ w: 50, r: 5 }, { w: 50, r: 5 }])[1]).toEqual({ w: 50, r: 5, done: false })
+  })
+})
+
+describe('exercises to add or swap in at the wrist', () => {
+  const cardio = EXDB.find(e => e.bp === 'cardio').id
+  const loose = EXDB.filter(e => e.bp !== 'cardio')[84].id, custom = 'custom-1'
+
+  it('names the recent ones newest first, and sends only those no ready routine has, with last time\'s work sets', () => {
+    const S = {
+      ...library,
+      customEx: [{ id: custom, n: 'My cable thing', bp: 'chest' }],
+      workouts: [...workouts, { id: 'late', d: '2026-10-20', entries: [
+        { id: loose, target: { sets: 2, reps: 12 }, sets: [{ w: 10, r: 12, done: true, phase: 'warmup' }, { w: 22.5, r: 12, done: true, at: 7 }, { w: 22.5, r: 11, done: true, at: 8 }] },
+        { id: cardio, target: { min: 20 }, sets: [{ min: 20, done: true }] },
+      ] }],
+    }
+    const ready = buildReady(S, '2026-10-26')
+    const ex = buildExercises(S, ready)
+    expect(ex.recent[0]).toBe(loose)
+    expect(ex.recent).not.toContain(cardio)
+    const ids0 = ex.extra.map(e => e.id)
+    expect(ids0).toContain(loose)
+    expect(ids0).toContain(custom)
+    expect(ids0.some(id => routines.some(r => r.ex.some(e => e.id === id)))).toBe(false)
+    const l = ex.extra.find(e => e.id === loose)
+    expect(l.sets).toEqual([{ w: 22.5, r: 12, sec: null, done: false, warmup: false }, { w: 22.5, r: 11, sec: null, done: false, warmup: false }])
+    // a custom exercise never done: the phone's defaults for a new one
+    expect(ex.extra.find(e => e.id === custom).sets.length).toBe(3)
+    // a body part for every exercise the watch lists, in words
+    expect(ex.parts[routines[0].ex[0].id]).toMatch(/\w/)
+    expect(ex.parts[loose]).toMatch(/\w/)
+    expect(ex.extra.length).toBeLessThanOrEqual(EXTRA_MAX)
+  })
+
+  it('a snapshot with them still fits, their "last time" lines going before the routines\'', () => {
+    const ready = buildReady(library, '2026-10-26')
+    const snap = { ...buildSnapshot(library, { ready }), exercises: buildExercises(library, ready) }
+    const fit = fitSnapshot(snap)
+    expect(bytes(fit)).toBeLessThanOrEqual(SNAPSHOT_MAX_BYTES)
+    expect(fit.ready.others).toHaveLength(11)
+    const tight = fitSnapshot({ ...snap, exercises: { ...snap.exercises, extra: [{ id: 'x', name: 'X', mode: 'reps', last: 'a'.repeat(400), sets: [] }] } }, bytes(snap) + 100)
+    expect(tight.exercises.extra[0].last).toBeUndefined()
+    expect(tight.ready.others[0].entries[0].last).toBeDefined()
+  })
+
+  it('an add and a swap go through the workout screen\'s own, at the watch\'s place', () => {
+    const S = { active: { id: 'w-1', cur: 0, entries: [{ id: '0025', sets: [{ w: 60, r: 8, done: true }] }, { id: '0426', sets: [{ w: 40, r: 8, done: false }] }] } }
+    const addExercise = vi.fn(), swapExercise = vi.fn()
+    bindWatchActions({ addExercise, swapExercise })
+    const rows = [{ w: 20, r: 10 }]
+    expect(applyEvents([
+      { id: 'x1', type: 'addExercise', wid: 'w-1', exId: '0001', index: 9, rows, at: 1 },
+      { id: 'x2', type: 'swapExercise', wid: 'w-1', exId: '0426', entryIdx: 7, to: '0002', rows, at: 2 },
+    ], () => ({ S }))).toEqual(['x1', 'x2'])
+    expect(addExercise).toHaveBeenCalledWith('0001', 2, [{ w: 20, r: 10, sec: null, warmup: false }])   // the end, at most
+    expect(swapExercise).toHaveBeenCalledWith(1, '0002', expect.any(Array))                            // found by its id
+  })
+
+  it('an exercise swapped after sets were logged keeps them, and both go into the saved workout and its records', () => {
+    const active = {
+      id: 'watch-1', d: '2026-10-26', start: 1000, cur: 0, routineIds: ['r0'], name: 'Push',
+      entries: [{ id: '0025', rid: 'r0', target: { sets: 3, reps: 8 }, sets: [{ w: 60, r: 8, done: true, at: 2000 }, { w: 60, r: 8, done: false }, { w: 60, r: 8, done: false }] }],
+    }
+    // the watch swapped bench for another press after one set (the phone's own swap, kept in place)
+    const res = swapActiveExercise(active, 0, { id: '0047', target: { sets: 2, reps: 10 }, sets: [{ w: 30, r: 10, done: false }, { w: 30, r: 10, done: false }] }, { loggedConfirmed: true, groupDisposition: 'keep' })
+    expect(res).toEqual({ inserted: true, index: 1 })
+    // its rows evened out with the watch's (one more set there), then ticked from the watch
+    active.entries[1].sets = alignToWatchRows(active.entries[1].sets, [{ w: 32.5, r: 10 }, { w: 32.5, r: 10 }, { w: 32.5, r: 9 }])
+    active.entries[1].sets.forEach((s, i) => Object.assign(s, { done: true, at: 3000 + i }))
+    const w = buildCompletedWorkout(active, { end: 9000 })
+    expect(w.entries.map(e => e.id)).toEqual(['0025', '0047'])
+    expect(w.entries[1].rid).toBe('r0')
+    expect(w.entries[1].sets.filter(s => s.done)).toHaveLength(3)
+    // what Finish takes into exWeights (next time's starting weight) for the swapped-in exercise
+    expect(bestWeightForEntry(w.entries[1])).toBe(32.5)
   })
 })

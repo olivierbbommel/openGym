@@ -30,7 +30,11 @@
 "More" = "Mehr";
 "Add set" = "Satz hinzufügen";
 "Remove set" = "Satz entfernen";
+"Add exercise" = "Übung hinzufügen";
+"Swap exercise" = "Übung wechseln";
+"Search…" = "Suchen…";
 "Last time: %@" = "Letztes Mal: %@";
+"Recent" = "Zuletzt";
 "No workout running" = "Kein Training läuft";
 "Start one on your iPhone and it shows up here." = "Starte eins auf dem iPhone, dann taucht es hier auf.";
 "All sets done" = "Alle Sätze erledigt";

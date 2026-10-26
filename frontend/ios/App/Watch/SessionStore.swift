@@ -512,6 +512,33 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         WKInterfaceDevice.current().play(.click)
     }
 
+    /// What can be added or swapped in here, the phone at home or not.
+    var picks: [Pick] { SessionCore.picks(state) }
+
+    /// Exercise `e` added after the one on screen, and shown, for the phone too.
+    func addExercise(_ e: Entry) {
+        ackRestOver()
+        let (next, event) = SessionCore.addExercise(state, e, at: Date().timeIntervalSince1970 * 1000, id: UUID().uuidString)
+        guard let ev = event else { return }
+        send(event: ev)
+        state = next
+        picked = [:]
+        loadTargets()
+        WKInterfaceDevice.current().play(.click)
+    }
+
+    /// Exercise `ei` swapped for `e`, and the new one shown, for the phone too.
+    func swapExercise(_ ei: Int, to e: Entry) {
+        ackRestOver()
+        let (next, event) = SessionCore.swapExercise(state, entry: ei, to: e, at: Date().timeIntervalSince1970 * 1000, id: UUID().uuidString)
+        guard let ev = event else { return }
+        send(event: ev)
+        state = next
+        picked = [:]
+        loadTargets()
+        WKInterfaceDevice.current().play(.click)
+    }
+
     /// Finishes the session: the phone saves it with its own Finish and save.
     func finish() {
         closeRest(at: Date())

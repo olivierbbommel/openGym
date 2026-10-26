@@ -1493,44 +1493,9 @@ export function swapActiveWorkoutExercise(index) {
     // The picker is a chooser here, not a stack you keep adding from: one swap, then back to
     // the workout. (The add flow deliberately leaves it open.)
     picker.close()
-    const full = { ...cfg, id: ex.id }
-    const st = S()
-    const current = st.active?.entries?.[index]
+    const current = S().active?.entries?.[index]
     if (!current) return
-    // A swap is an in-place substitution — routine identity is unchanged, so the replacement
-    // keeps the slot's own `rid` and reads its prescription from that routine (not a
-    // session-wide one). A slot with no `rid` is freestyle.
-    const slotRoutine = current.rid ? st.routines.find(r => r.id === current.rid) : null
-    const freestyle = !slotRoutine
-    // Same rows the add flow builds: last time's loads and, in a planned session, the
-    // prescription — swapping barbell for dumbbell bench must not start you at an empty bar.
-    // Built from what came before the session's day when it is logged into the past (sessionHistory).
-    const step = modeOf(full) === 'reps' ? weightIncrement(full, st.unit) : defaultIncrement(ex.id, st.unit)
-    const past = sessionHistory(st)
-    // A freestyle swap logs dumbbell weights the way the exercise means them now, and starts
-    // from last time read in that meaning (lib/dumbbells.js), as a planned one does.
-    const built = freestyle
-      ? { target: withMeaning(st, cfg, ex.id), plan: null, sets: applyIntensifierPlan(buildSets(historyAs(past, ex.id, dbLoadFor(st, full)), full, { step: (modeOf(full) === 'reps' && ownedWeightsFor(st, full)) || step, preferLast: true }), full, dropGrid(st, full)) }
-      : buildPlannedEntry(past, full, slotRoutine, { noProg: builtOutOfProgression(current, slotRoutine) })
-    const replacement = {
-      id: ex.id,
-      ...built,
-      ...(current.rid ? { rid: current.rid } : {}),
-      // A slot kept out of progression stays out once swapped. Replaced in place the entry keeps
-      // it anyway; inserted beside logged sets, the replacement would otherwise count as a
-      // regular session of the new exercise. Only a deload or rehab slot is built without a
-      // prescription (above): one kept out by hand keeps the marker and its Undo on the card,
-      // and an Undo must leave numbers that are right to count.
-      ...(current.noProg === true ? { noProg: true } : {}),
-    }
-
-    const apply = options => {
-      // A timed callback closes over entry/set indexes. Invalidate it, and the current rest,
-      // before the selected occurrence can be replaced or a new entry shifts those indexes.
-      ui().stopWork()
-      ui().stopRest()
-      update(state => { swapActiveExercise(state.active, index, replacement, options) }, true)
-    }
+    const apply = options => swapActiveWorkoutExerciseNow(index, ex, cfg, options)
     const logged = (current.sets || []).some(set => set.done === true)
     if (!logged) { apply(); return }
 
@@ -1558,6 +1523,52 @@ export function swapActiveWorkoutExercise(index) {
       onConfirm: () => apply({ loggedConfirmed: true })
     })
   }
+}
+
+/**
+ * Swaps entry `index` of the running session for `ex` built with `cfg`, as the Swap picker does
+ * once its questions are answered (`options`: lib/active-exercise-swap.js). The Apple Watch swaps
+ * through this too, its answer always "keep it in its group". Returns where the replacement went.
+ */
+export function swapActiveWorkoutExerciseNow(index, ex, cfg, options) {
+  const full = { ...cfg, id: ex.id }
+  const st = S()
+  const current = st.active?.entries?.[index]
+  if (!current) return null
+  // A swap is an in-place substitution — routine identity is unchanged, so the replacement
+  // keeps the slot's own `rid` and reads its prescription from that routine (not a
+  // session-wide one). A slot with no `rid` is freestyle.
+  const slotRoutine = current.rid ? st.routines.find(r => r.id === current.rid) : null
+  const freestyle = !slotRoutine
+  // Same rows the add flow builds: last time's loads and, in a planned session, the
+  // prescription — swapping barbell for dumbbell bench must not start you at an empty bar.
+  // Built from what came before the session's day when it is logged into the past (sessionHistory).
+  const step = modeOf(full) === 'reps' ? weightIncrement(full, st.unit) : defaultIncrement(ex.id, st.unit)
+  const past = sessionHistory(st)
+  // A freestyle swap logs dumbbell weights the way the exercise means them now, and starts
+  // from last time read in that meaning (lib/dumbbells.js), as a planned one does.
+  const built = freestyle
+    ? { target: withMeaning(st, cfg, ex.id), plan: null, sets: applyIntensifierPlan(buildSets(historyAs(past, ex.id, dbLoadFor(st, full)), full, { step: (modeOf(full) === 'reps' && ownedWeightsFor(st, full)) || step, preferLast: true }), full, dropGrid(st, full)) }
+    : buildPlannedEntry(past, full, slotRoutine, { noProg: builtOutOfProgression(current, slotRoutine) })
+  const replacement = {
+    id: ex.id,
+    ...built,
+    ...(current.rid ? { rid: current.rid } : {}),
+    // A slot kept out of progression stays out once swapped. Replaced in place the entry keeps
+    // it anyway; inserted beside logged sets, the replacement would otherwise count as a
+    // regular session of the new exercise. Only a deload or rehab slot is built without a
+    // prescription (above): one kept out by hand keeps the marker and its Undo on the card,
+    // and an Undo must leave numbers that are right to count.
+    ...(current.noProg === true ? { noProg: true } : {}),
+  }
+
+  // A timed callback closes over entry/set indexes. Invalidate it, and the current rest,
+  // before the selected occurrence can be replaced or a new entry shifts those indexes.
+  ui().stopWork()
+  ui().stopRest()
+  let result = null
+  update(state => { result = swapActiveExercise(state.active, index, replacement, options) }, true)
+  return result
 }
 
 /* ============================ equipment profiles ============================ */

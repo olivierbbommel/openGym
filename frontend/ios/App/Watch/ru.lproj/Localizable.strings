@@ -30,7 +30,11 @@
 "More" = "Больше";
 "Add set" = "Добавить подход";
 "Remove set" = "Убрать подход";
+"Add exercise" = "Добавить упражнение";
+"Swap exercise" = "Заменить упражнение";
+"Search…" = "Поиск…";
 "Last time: %@" = "В прошлый раз: %@";
+"Recent" = "Недавние";
 "No workout running" = "Тренировка не идёт";
 "Start one on your iPhone and it shows up here." = "Начните её на iPhone, и она появится здесь.";
 "All sets done" = "Все подходы сделаны";

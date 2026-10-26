@@ -30,7 +30,11 @@
 "More" = "Több";
 "Add set" = "Sorozat hozzáadása";
 "Remove set" = "Sorozat eltávolítása";
+"Add exercise" = "Gyakorlat hozzáadása";
+"Swap exercise" = "Gyakorlat cseréje";
+"Search…" = "Keresés…";
 "Last time: %@" = "Legutóbb: %@";
+"Recent" = "Legutóbbiak";
 "No workout running" = "Nincs folyamatban edzés";
 "Start one on your iPhone and it shows up here." = "Indíts egyet az iPhone-on, és itt megjelenik.";
 "All sets done" = "Minden sorozat kész";

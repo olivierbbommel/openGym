@@ -51,12 +51,21 @@ const FROM_APP = {
   'More': 'More',
   'Add set': 'Add set',
   'Remove set': 'Remove set',
+  'Add exercise': 'Add exercise',
+  'Swap exercise': 'Swap exercise',
+  'Search…': 'Search…',
 }
 // Built from an app word: "Last time: %@".
 const COMPOSED = { 'Last time: %@': ['Last time', w => `${w}: %@`] }
 
 // Only the watch says these. %@ is a name, %lld a number, as the Swift source interpolates them.
 const OWN = {
+  // The exercises done lately, at the top of the watch's list to add or swap in.
+  'Recent': {
+    de: 'Zuletzt', fr: 'Récents', es: 'Recientes', it: 'Recenti', 'pt-PT': 'Recentes', 'pt-BR': 'Recentes', pl: 'Ostatnie',
+    hu: 'Legutóbbiak', tr: 'Son kullanılanlar', ru: 'Недавние', uk: 'Нещодавні', ar: 'الأخيرة', hi: 'हाल के', bn: 'সাম্প্রতিক',
+    th: 'ล่าสุด', ko: '최근', 'zh-Hans': '最近', 'zh-Hant': '最近',
+  },
   'No workout running': {
     de: 'Kein Training läuft', fr: 'Aucune séance en cours', es: 'Ningún entreno en curso', it: 'Nessun allenamento in corso',
     'pt-PT': 'Nenhum treino a decorrer', 'pt-BR': 'Nenhum treino em andamento', pl: 'Żaden trening nie trwa', hu: 'Nincs folyamatban edzés',

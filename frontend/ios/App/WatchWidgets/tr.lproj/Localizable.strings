@@ -30,7 +30,11 @@
 "More" = "Çok";
 "Add set" = "Set ekle";
 "Remove set" = "Set kaldır";
+"Add exercise" = "Egzersiz ekle";
+"Swap exercise" = "Egzersizi değiştir";
+"Search…" = "Ara…";
 "Last time: %@" = "Geçen sefer: %@";
+"Recent" = "Son kullanılanlar";
 "No workout running" = "Devam eden antrenman yok";
 "Start one on your iPhone and it shows up here." = "iPhone’unda bir tane başlat, burada görünür.";
 "All sets done" = "Tüm setler tamam";

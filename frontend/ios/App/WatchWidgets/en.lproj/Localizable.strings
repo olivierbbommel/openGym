@@ -30,7 +30,11 @@
 "More" = "More";
 "Add set" = "Add set";
 "Remove set" = "Remove set";
+"Add exercise" = "Add exercise";
+"Swap exercise" = "Swap exercise";
+"Search…" = "Search…";
 "Last time: %@" = "Last time: %@";
+"Recent" = "Recent";
 "No workout running" = "No workout running";
 "Start one on your iPhone and it shows up here." = "Start one on your iPhone and it shows up here.";
 "All sets done" = "All sets done";

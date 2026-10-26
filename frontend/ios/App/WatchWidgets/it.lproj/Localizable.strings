@@ -30,7 +30,11 @@
 "More" = "Più";
 "Add set" = "Aggiungi serie";
 "Remove set" = "Rimuovi serie";
+"Add exercise" = "Aggiungi esercizio";
+"Swap exercise" = "Sostituisci esercizio";
+"Search…" = "Cerca…";
 "Last time: %@" = "L'ultima volta: %@";
+"Recent" = "Recenti";
 "No workout running" = "Nessun allenamento in corso";
 "Start one on your iPhone and it shows up here." = "Avviane uno sull’iPhone e comparirà qui.";
 "All sets done" = "Tutte le serie fatte";

@@ -30,7 +30,11 @@
 "More" = "更多";
 "Add set" = "加一组";
 "Remove set" = "减一组";
+"Add exercise" = "添加动作";
+"Swap exercise" = "更换动作";
+"Search…" = "搜索…";
 "Last time: %@" = "上次: %@";
+"Recent" = "最近";
 "No workout running" = "没有进行中的训练";
 "Start one on your iPhone and it shows up here." = "在 iPhone 上开始，它就会出现在这里。";
 "All sets done" = "所有组已完成";

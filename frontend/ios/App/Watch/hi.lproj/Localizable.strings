@@ -30,7 +30,11 @@
 "More" = "अधिक";
 "Add set" = "सेट जोड़ें";
 "Remove set" = "सेट हटाएँ";
+"Add exercise" = "व्यायाम जोड़ें";
+"Swap exercise" = "व्यायाम बदलें";
+"Search…" = "खोजें…";
 "Last time: %@" = "पिछली बार: %@";
+"Recent" = "हाल के";
 "No workout running" = "कोई वर्कआउट नहीं चल रहा";
 "Start one on your iPhone and it shows up here." = "iPhone पर एक शुरू करें, यह यहाँ दिखेगा।";
 "All sets done" = "सारे सेट पूरे";

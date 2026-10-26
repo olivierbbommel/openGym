@@ -363,7 +363,7 @@ struct ExercisePage: View {
             .sheet(item: $editing) { field in
                 ValueEditor(field: field, entry: entry, unit: w.unit)
             }
-            .sheet(isPresented: $actions) { ExerciseActions(index: index) }
+            .sheet(isPresented: $actions) { ExerciseActions(index: index) { actions = false } }
             .confirmationDialog(Text("Skip this set?"), isPresented: $confirmSkip) {
                 Button("Skip set") { store.skipSet() }
                 Button("Cancel", role: .cancel) {}
@@ -476,34 +476,103 @@ struct ExercisePage: View {
  */
 struct ExerciseActions: View {
     @EnvironmentObject var store: SessionStore
-    @Environment(\.dismiss) private var dismiss
     let index: Int
+    /// Closes the whole sheet (a choice in the exercise list, pushed on it, closes it too).
+    let close: () -> Void
 
     var body: some View {
-        if let w = store.workout, w.entries.indices.contains(index) {
-            let entry = w.entries[index]
-            let si = store.setIndex(in: index)
-            List {
-                Text(verbatim: entry.name)
-                    .font(.system(.footnote, design: .rounded).weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .listRowBackground(Color.clear)
-                if !entry.isCardio {
-                    row("plus.circle", Text("Add set")) { store.addSet(in: index) }
-                }
-                // The set up next, the one its dots ring (only one not done; one always stays).
-                if let si = si, entry.sets.count > 1 {
-                    row("minus.circle", Text("Remove set")) { store.removeSet(si, in: index) }
+        NavigationStack {
+            if let w = store.workout, w.entries.indices.contains(index) {
+                let entry = w.entries[index]
+                let si = store.setIndex(in: index)
+                List {
+                    Text(verbatim: entry.name)
+                        .font(.system(.footnote, design: .rounded).weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .listRowBackground(Color.clear)
+                    if !entry.isCardio {
+                        row("plus.circle", Text("Add set")) { store.addSet(in: index) }
+                    }
+                    // The set up next, the one its dots ring (only one not done; one always stays).
+                    if let si = si, entry.sets.count > 1 {
+                        row("minus.circle", Text("Remove set")) { store.removeSet(si, in: index) }
+                    }
+                    NavigationLink {
+                        ExercisePicker(title: Text("Swap exercise"), exclude: entry.id) { store.swapExercise(index, to: $0); close() }
+                    } label: { label("arrow.triangle.2.circlepath", Text("Swap exercise")) }
+                    NavigationLink {
+                        ExercisePicker(title: Text("Add exercise"), exclude: nil) { store.addExercise($0); close() }
+                    } label: { label("text.badge.plus", Text("Add exercise")) }
                 }
             }
         }
     }
 
-    private func row(_ symbol: String, _ label: Text, _ action: @escaping () -> Void) -> some View {
-        Button { action(); dismiss() } label: {
-            Label { label } icon: { Image(systemName: symbol).foregroundStyle(Theme.accent) }
-                .frame(minHeight: Theme.tap)
+    private func label(_ symbol: String, _ text: Text) -> some View {
+        Label { text } icon: { Image(systemName: symbol).foregroundStyle(Theme.accent) }
+            .frame(minHeight: Theme.tap)
+    }
+
+    private func row(_ symbol: String, _ text: Text, _ action: @escaping () -> Void) -> some View {
+        Button { action(); close() } label: { label(symbol, text) }
+    }
+}
+
+/*
+ * The exercises to add or swap in, with the phone at home: a search at the top (dictation or
+ * Scribble, as the watch types), then the ones done lately, then the rest by body part. Each row
+ * says how it would start (sets × reps, weight).
+ */
+struct ExercisePicker: View {
+    @EnvironmentObject var store: SessionStore
+    let title: Text
+    /// The exercise being swapped out, not offered for itself.
+    let exclude: String?
+    let choose: (Entry) -> Void
+    @State private var query = ""
+
+    var body: some View {
+        let all = store.picks.filter { $0.id != exclude }
+        List {
+            TextField("Search…", text: $query)
+            if query.isEmpty {
+                let recent = all.filter { $0.recent != nil }.sorted { ($0.recent ?? 0) < ($1.recent ?? 0) }.prefix(8)
+                if !recent.isEmpty {
+                    Section { ForEach(Array(recent)) { pickRow($0) } } header: { Text("Recent") }
+                }
+                let parts = Dictionary(grouping: all) { $0.part }
+                ForEach(parts.keys.sorted(), id: \.self) { part in
+                    Section {
+                        ForEach(parts[part]!.sorted { $0.entry.name < $1.entry.name }) { pickRow($0) }
+                    } header: { Text(verbatim: part) }
+                }
+            } else {
+                let q = query.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+                ForEach(all.filter { $0.entry.name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil).contains(q) }) { pickRow($0) }
+            }
         }
+        .navigationTitle(title)
+    }
+
+    private func pickRow(_ p: Pick) -> some View {
+        Button { choose(p.entry) } label: {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(verbatim: p.entry.name).font(.system(.body, design: .rounded)).lineLimit(2)
+                Text(verbatim: ExercisePicker.plan(p.entry, unit: store.unit)).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+            }
+            .frame(minHeight: Theme.tap, alignment: .leading)
+        }
+    }
+
+    /// "3 × 8 · 60 kg", "3 × 45 s", "3 × 10": how it would start.
+    static func plan(_ e: Entry, unit: String) -> String {
+        let work = e.sets.filter { !$0.warmup }
+        guard let first = work.first ?? e.sets.first else { return "" }
+        let n = max(1, work.count)
+        if e.isTimed { return "\(n) × \(formatNumber(first.sec ?? 0)) s" }
+        let reps = "\(n) × \(formatNumber(first.r ?? 0))"
+        let w = first.w ?? 0
+        return w > 0 ? "\(reps) · \(e.isBodyweight ? "+" : "")\(formatNumber(w)) \(unit)" : reps
     }
 }
 
@@ -803,6 +872,7 @@ struct SetDots: View {
 struct FinishPage: View {
     @EnvironmentObject var store: SessionStore
     @State private var confirming = false
+    @State private var adding = false
 
     var body: some View {
         VStack(spacing: 8) {
@@ -815,6 +885,15 @@ struct FinishPage: View {
             if p.total > 0 {
                 Text("\(p.done) of \(p.total) sets").font(.caption2).foregroundStyle(.secondary)
             }
+            // One more exercise after the last, the phone at home or not.
+            Button { adding = true } label: {
+                Label { Text("Add exercise") } icon: { Image(systemName: "plus") }
+                    .font(.footnote.weight(.semibold))
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 36)
+                    .background(Capsule().fill(Theme.dim))
+            }
+            .buttonStyle(.plain)
             if store.offline {
                 Text("Saved on the watch, syncs later").font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
@@ -824,6 +903,11 @@ struct FinishPage: View {
         .confirmationDialog("Finish workout?", isPresented: $confirming) {
             Button("Finish and save") { store.finish() }
             Button("Cancel", role: .cancel) {}
+        }
+        .sheet(isPresented: $adding) {
+            NavigationStack {
+                ExercisePicker(title: Text("Add exercise"), exclude: nil) { store.addExercise($0); adding = false }
+            }
         }
     }
 }

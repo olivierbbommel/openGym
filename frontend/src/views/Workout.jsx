@@ -26,7 +26,7 @@ import WorkoutThumb, { hasWorkoutMedia } from '../components/WorkoutThumb.jsx'
 import { workoutSettingsSheet } from '../components/WorkoutSettingsSheet.jsx'
 import { durationSheet } from '../components/DurationWheel.jsx'
 import { REST_MAX, fmtRest } from '../lib/duration.js'
-import { startFlow, exercisePicker, exConfigSheet, exerciseDetailSheet, finishWorkout, exitWorkoutEdit, workoutCompleteSheet, confirmSheet, exerciseNoteSheet, sessionNoteSheet, renameWorkoutSheet, swapActiveWorkoutExercise, barWeightSheet, menuSheet, effortPickerSheet, exerciseHistorySheet, addRoutineToSessionSheet, finishWorkoutSheet, finishWorkoutNow } from '../sheets.jsx'
+import { startFlow, exercisePicker, exConfigSheet, exerciseDetailSheet, finishWorkout, exitWorkoutEdit, workoutCompleteSheet, confirmSheet, exerciseNoteSheet, sessionNoteSheet, renameWorkoutSheet, swapActiveWorkoutExercise, swapActiveWorkoutExerciseNow, barWeightSheet, menuSheet, effortPickerSheet, exerciseHistorySheet, addRoutineToSessionSheet, finishWorkoutSheet, finishWorkoutNow } from '../sheets.jsx'
 import { afterScrollRestore, scrollRestorePending } from '../components/Modals.jsx'
 import { effortColor } from '../lib/effort.js'
 import Elapsed from '../components/Elapsed.jsx'
@@ -1395,7 +1395,10 @@ function ActiveWorkout() {
     workoutCompleteSheet()
   }
   // Adds an exercise after the current unit: the button under the session and the ⋯ menu's Add.
-  const addExercise = () => exercisePicker((ex, quick) => {
+  // How an exercise is added next to entry `anchor` (the current one, or the watch's): the routine
+  // it joins, its seed config, and the commit that builds and inserts it (after the anchor's unit,
+  // or at `at` when the watch says where).
+  const addPlanFor = (ex, anchor, st = S) => {
     // A freehand add inherits the current unit's routine (its `rid`) so it lands in that
     // routine's block in a combined session and gets a real prescription; a routine-less
     // freestyle session has no `rid` to inherit. It inherits the block's `noProg` too: an
@@ -1404,16 +1407,16 @@ function ActiveWorkout() {
     // never becomes the baseline the regular sessions progress from. An exercise kept out by
     // hand (its ⋯ menu) is that exercise's own choice for today and is not passed on; a session
     // kept out as a whole (the header ⋮) takes the new one with it (joinSessionNoProg).
-    const curEntry = A.entries[A.cur]
+    const curEntry = st.active?.entries?.[anchor]
     const curRid = curEntry?.rid
-    const routine = curRid ? S.routines.find(r => r.id === curRid) : null
+    const routine = curRid ? st.routines.find(r => r.id === curRid) : null
     const freestyle = !routine
     const noProg = !freestyle && builtOutOfProgression(curEntry, routine)
     // Freestyle has no routine prescription to apply: show the last target in the config
     // sheet and carry its completed rows forward. A planned session uses its configured
     // target when progression is off, while progression-enabled sessions keep their path.
-    const seed = freestyle ? freestyleConfig(sessionHistory(S), { id: ex.id, ...defaultConfig(ex.id) }) : null
-    const commit = cfg => {
+    const seed = freestyle ? freestyleConfig(sessionHistory(st), { id: ex.id, ...defaultConfig(ex.id) }) : null
+    const commit = (cfg, at = null) => {
       if (focusMode) focusPointerEpoch.current++
       update(s => {
         const full = { ...cfg, id: ex.id }
@@ -1428,12 +1431,17 @@ function ActiveWorkout() {
             step: modeOf(full) === 'reps' ? (ownedWeightsFor(s, full) || weightIncrement(full, s.unit)) : defaultIncrement(ex.id, s.unit), preferLast: true,
           }), full, dropGrid(s, full)) }
           : buildPlannedEntry(past, full, routine, { noProg })
-        const insertAt = insertionIndexAfterCurrentUnit(supersetUnits(s.active.entries), s.active.cur, s.active.entries.length)
+        const insertAt = at != null ? Math.max(0, Math.min(s.active.entries.length, at))
+          : insertionIndexAfterCurrentUnit(supersetUnits(s.active.entries), s.active.cur, s.active.entries.length)
         s.active.entries.splice(insertAt, 0, joinSessionNoProg(s.active, { id: ex.id, ...built, ...(curRid ? { rid: curRid } : {}), ...(noProg ? { noProg: true } : {}) }))
         s.active.cur = insertAt
         useUI.getState().shiftRestOwner(insertAt, 1)
       })
     }
+    return { routine, seed, commit }
+  }
+  const addExercise = () => exercisePicker((ex, quick) => {
+    const { routine, seed, commit } = addPlanFor(ex, A.cur)
     // The "+" on a picker row reads as "add this now" — routed through the same detail
     // sheet before, so it added nothing until you'd scrolled past it and found the real
     // button. Quick-add commits with the same default (or, freestyle, last-session) config
@@ -1786,7 +1794,7 @@ function ActiveWorkout() {
   // The watch's changes to the session (a set added or removed there) run the same actions a tap
   // here runs, then the rows are evened out with the watch's (lib/watch-sync.js alignToWatchRows).
   const watchEditRef = useRef(null)
-  watchEditRef.current = { addSet }
+  watchEditRef.current = { addSet, addPlanFor }
   // The time is the watch's: the phone may hear of the set much later (lib/finish-workout.js
   // sessionEnd reads the sets' times). The watch's Finish runs the phone's Finish and save.
   useEffect(() => bindWatchActions({
@@ -1829,6 +1837,25 @@ function ActiveWorkout() {
       const set = A.entries?.[idx]?.sets?.[i]
       if (set && !set.done) deleteActiveSet(idx, i)
       if (rows) mutEntry(idx, en => { if (en) en.sets = alignToWatchRows(en.sets, rows) })
+    },
+    // An exercise added at the wrist, at the watch's place for it: built as the picker's quick add
+    // builds one (the routine of the exercise before it, or freestyle with last time's numbers).
+    addExercise: (exId, at, rows) => {
+      const st = useStore.getState().S
+      if (!st.active || st.active.editingWorkoutId) return
+      const ex = exOr(exId)
+      const { seed, commit } = watchEditRef.current.addPlanFor(ex, Math.max(0, at - 1), st)
+      commit(seed || defaultConfig(ex.id), at)
+      if (rows) mutEntry(at, en => { if (en) en.sets = alignToWatchRows(en.sets, rows) })
+    },
+    // Swapped at the wrist: the picker's quick swap, answered "keep it in its group" when the old
+    // one has logged sets (the watch puts the new one right after it, as the phone does then).
+    swapExercise: (idx, toId, rows) => {
+      const st = useStore.getState().S
+      if (!st.active || st.active.editingWorkoutId) return
+      const ex = exOr(toId)
+      const res = swapActiveWorkoutExerciseNow(idx, ex, defaultConfig(ex.id), { loggedConfirmed: true, groupDisposition: 'keep' })
+      if (res && Number.isInteger(res.index) && rows) mutEntry(res.index, en => { if (en) en.sets = alignToWatchRows(en.sets, rows) })
     },
   }), [])
 

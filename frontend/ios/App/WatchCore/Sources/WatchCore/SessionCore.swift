@@ -61,21 +61,26 @@ struct SessionState: Codable, Equatable {
     /// Changes made here to the session's shape (a set added or removed), by event id, until a
     /// snapshot says the phone applied them: until then they are laid over each snapshot.
     var edits: [WatchEdit]?
+    /// The exercises beside the ready routines' that the watch can add or swap in.
+    var catalog: ExerciseCatalog?
 }
 
 /// A change made here to the session's shape, as it is laid over a snapshot again.
 struct WatchEdit: Codable, Equatable {
     /// The event's id, which the phone names in `applied` once it has it.
     var id: String
-    /// "addSet" or "removeSet".
+    /// "addSet", "removeSet", "addExercise" or "swapExercise".
     var kind: String
     var exId: String
-    /// The exercise's place when the change was made (found by `exId` when it moved).
+    /// The exercise's place when the change was made (found by `exId` when it moved); for an
+    /// exercise added, where it went.
     var entry: Int
     /// removeSet: the set taken out.
     var set: Int?
     /// addSet: the rows added.
     var rows: [SetRow]?
+    /// addExercise, swapExercise: the exercise that came in.
+    var added: Entry?
 }
 
 typealias Event = [String: Any]
@@ -89,6 +94,7 @@ enum SessionCore {
     static func applySnapshot(_ s0: SessionState, _ snap: Snapshot) -> SessionState {
         var s = s0
         s.ready = snap.ready
+        s.catalog = snap.exercises
         if let u = snap.unit { s.unit = u }
         if let r = snap.restSec, r > 0 { s.restSec = r }
         if let st = snap.settings { s.settings = st }
@@ -218,8 +224,14 @@ enum SessionCore {
     /// One change made here, laid over a workout (a snapshot that does not have it yet).
     static func applyEdit(_ w0: ActiveWorkout, _ e: WatchEdit) -> ActiveWorkout {
         var w = w0
+        if e.kind == "addExercise", let added = e.added {
+            w.entries.insert(added, at: min(max(0, e.entry), w.entries.count))
+            return w
+        }
         guard let ei = entryIndex(w, e.entry, e.exId) else { return w }
         switch e.kind {
+        case "swapExercise":
+            if let added = e.added { w.entries = swapped(w.entries, at: ei, with: added).entries }
         case "addSet":
             w.entries[ei].sets.append(contentsOf: e.rows ?? [])
         case "removeSet":
@@ -286,6 +298,96 @@ enum SessionCore {
         remember(&s, WatchEdit(id: id, kind: "removeSet", exId: exId, entry: ei, set: si, rows: nil))
         return (s, ["id": id, "type": "removeSet", "wid": w.id ?? "", "exId": exId, "entryIdx": ei, "setIdx": si,
                     "rows": rowsPayload(w.entries[ei].sets), "at": at])
+    }
+
+    /// An exercise as it starts: its rows not done (the numbers kept), in no superset of its own.
+    static func startable(_ e0: Entry) -> Entry {
+        var e = e0
+        e.group = nil
+        e.sets = e.sets.map { row in
+            var r = row
+            r.done = false
+            r.at = nil
+            if let s = r.sides { r.sides = Sides(L: SideRow(w: s.L.w, r: s.L.r, done: false), R: SideRow(w: s.R.w, r: s.R.r, done: false)) }
+            return r
+        }
+        return e
+    }
+
+    /// What the watch can add or swap in: the ready routines' exercises (as they would start
+    /// there), then the phone's others, each once, cardio left to the phone. Recent ones carry
+    /// their place among the recent.
+    static func picks(_ s: SessionState) -> [Pick] {
+        let recent = s.catalog?.recent ?? []
+        let parts = s.catalog?.parts ?? [:]
+        var seen = Set<String>()
+        var out: [Pick] = []
+        let all = (s.ready?.today?.entries ?? []) + (s.ready?.others ?? []).flatMap { $0.entries } + (s.catalog?.extra ?? [])
+        for e in all where !e.isCardio && !seen.contains(e.id) {
+            seen.insert(e.id)
+            out.append(Pick(entry: startable(e), part: parts[e.id] ?? "", recent: recent.firstIndex(of: e.id)))
+        }
+        return out
+    }
+
+    /// Where an exercise added after exercise `ei` goes: after the superset `ei` is in, if any
+    /// (the phone's insertionIndexAfterCurrentUnit); after the last from the Finish page.
+    static func insertionIndex(_ w: ActiveWorkout, after ei: Int) -> Int {
+        guard w.entries.indices.contains(ei) else { return w.entries.count }
+        var hi = ei
+        if let g = w.entries[ei].group {
+            while hi + 1 < w.entries.count && w.entries[hi + 1].group == g { hi += 1 }
+        }
+        return hi + 1
+    }
+
+    /// `entries` with exercise `ei` swapped for `e`, as the phone swaps (lib/active-exercise-swap.js):
+    /// one with no set done is replaced where it is, in its superset; one with sets done keeps them,
+    /// and the new one goes right after it, in the same superset (the phone's "keep in group").
+    static func swapped(_ entries0: [Entry], at ei: Int, with e: Entry) -> (entries: [Entry], index: Int) {
+        var entries = entries0
+        var entry = e
+        entry.group = entries[ei].group
+        if entries[ei].sets.contains(where: { $0.done }) {
+            entries.insert(entry, at: ei + 1)
+            return (entries, ei + 1)
+        }
+        entries[ei] = entry
+        return (entries, ei)
+    }
+
+    /// Exercise `e` added here, after the one on screen (and its superset), and up next.
+    static func addExercise(_ s0: SessionState, _ e: Entry, at: Double, id: String) -> (SessionState, Event?) {
+        guard var w = s0.workout else { return (s0, nil) }
+        var s = s0
+        let entry = startable(e)
+        let idx = insertionIndex(w, after: s0.entryIndex)
+        w.entries.insert(entry, at: idx)
+        s.workout = w
+        s.entryIndex = idx
+        remember(&s, WatchEdit(id: id, kind: "addExercise", exId: entry.id, entry: idx, set: nil, rows: nil, added: entry))
+        return (s, ["id": id, "type": "addExercise", "wid": w.id ?? "", "exId": entry.id, "index": idx,
+                    "rows": rowsPayload(entry.sets), "at": at])
+    }
+
+    /// Exercise `ei` swapped for `e` here (as `swapped`), the new one up next.
+    static func swapExercise(_ s0: SessionState, entry ei: Int, to e: Entry, at: Double, id: String) -> (SessionState, Event?) {
+        guard var w = s0.workout, w.entries.indices.contains(ei), w.entries[ei].id != e.id else { return (s0, nil) }
+        var s = s0
+        let old = w.entries[ei]
+        let entry = startable(e)
+        let (entries, idx) = swapped(w.entries, at: ei, with: entry)
+        w.entries = entries
+        s.workout = w
+        s.entryIndex = idx
+        if idx == ei {
+            // Replaced where it was: nothing of the old one was done, its skips go with it.
+            s.pending = s.pending.filter { !$0.key.hasPrefix(old.id + "#") }
+            s.skipped = s.skipped?.filter { !$0.hasPrefix(old.id + "#") }
+        }
+        remember(&s, WatchEdit(id: id, kind: "swapExercise", exId: old.id, entry: ei, set: nil, rows: nil, added: w.entries[idx]))
+        return (s, ["id": id, "type": "swapExercise", "wid": w.id ?? "", "exId": old.id, "entryIdx": ei, "to": entry.id,
+                    "index": idx, "rows": rowsPayload(w.entries[idx].sets), "at": at])
     }
 
     /// Keys "exId#i" (and "exId#i#side") of the sets after `si` moved up one; the one at `si` gone.

@@ -30,7 +30,11 @@
 "More" = "많음";
 "Add set" = "세트 추가";
 "Remove set" = "세트 빼기";
+"Add exercise" = "운동 추가";
+"Swap exercise" = "운동 바꾸기";
+"Search…" = "검색…";
 "Last time: %@" = "지난번: %@";
+"Recent" = "최근";
 "No workout running" = "진행 중인 운동이 없어요";
 "Start one on your iPhone and it shows up here." = "iPhone에서 시작하면 여기에 나타나요.";
 "All sets done" = "모든 세트 완료";
