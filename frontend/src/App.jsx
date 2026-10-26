@@ -15,6 +15,7 @@ import { workoutVolume } from './lib/history.js'
 import { setSystemBarsLight } from './lib/system-bars.js'
 import { initBackButton } from './lib/back.js'
 import { installEdgeSwipeBack, BACK_PREVIEW_EVENT } from './lib/edge-swipe-back.js'
+import { installScrollFades } from './lib/scroll-fade.js'
 import { startWatchSync, startInboxSync, bindWatchAppActions, patchSetIn } from './lib/watch-sync.js'
 import { stampWorkout } from './lib/sync-merge.js'
 import { logWeighIn } from './lib/bodyweight.js'
@@ -335,6 +336,8 @@ export default function App() {
   }, [])
   // iOS: swipe from the left edge for the page's own back button (lib/edge-swipe-back.js)
   useEffect(() => installEdgeSwipeBack(), [])
+  // Rows of chips that scroll sideways fade at the edge that hides more (lib/scroll-fade.js).
+  useEffect(() => installScrollFades(), [])
   // iPhone app with an Apple Watch: the running workout goes to the watch, its ticks come back
   // (lib/watch-sync.js). Elsewhere (the web, Android) only what the watch wrote into the profile
   // with the phone at home (lib/watch-inbox.js): applied the same way, with the same actions.

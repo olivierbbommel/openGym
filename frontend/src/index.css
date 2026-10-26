@@ -601,6 +601,10 @@ h4.sec{
   scrollbar-width:none;
 }
 .chips::-webkit-scrollbar{display:none}
+/* More chips than fit: the edge that hides more fades out (lib/scroll-fade.js sets which). */
+.more-r{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 36px),transparent)}
+.more-l{-webkit-mask-image:linear-gradient(to left,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(to left,#000 calc(100% - 36px),transparent)}
+.more-l.more-r{-webkit-mask-image:linear-gradient(to right,transparent,#000 36px,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(to right,transparent,#000 36px,#000 calc(100% - 36px),transparent)}
 /* horizontal strips: keep a sideways overscroll from chaining to the page and leave a
    margin when a chip is scrolled into view. The chip row also claims the horizontal axis
    (touch-action:pan-x): on a phone a slightly diagonal swipe along the chips used to hand
@@ -2286,4 +2290,6 @@ button.wl-summary{width:100%;padding:0 0 10px;text-align:start;border-radius:var
   body:not(.no-tabbar) .conn-bar{padding-right:calc(var(--pad) + var(--rail))}
   body:not(.no-tabbar) #timer{left:calc(12px + var(--sal));margin-left:0;width:auto;right:calc(12px + var(--rail));bottom:calc(12px + var(--sab))}
   body:not(.no-tabbar) #toast{bottom:calc(24px + var(--sab));left:calc((100% - var(--rail) + var(--sal)) / 2)}
+  /* The Coach intro's sticky buttons sat 58px up, over the bottom tab bar that is on the side here. */
+  body .ob-foot{bottom:calc(8px + var(--sab))}
 }
