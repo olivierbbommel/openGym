@@ -8,13 +8,13 @@
 #
 #   ruby frontend/ios/ci/add-widgets.rb
 #
-# App Store Connect needs, before a signed build: the bundle id ch.opengym.app.widgets with the
-# App Group group.ch.opengym.app, and an App Store provisioning profile for it, which the release
+# App Store Connect needs, before a signed build: the bundle id com.olibos.opengym.widgets with the
+# App Group group.com.olibos.opengym, and an App Store provisioning profile for it, which the release
 # script signs the extension with (scripts/ios/finish-ipa.sh, WIDGETS_PROFILE).
 require 'xcodeproj'
 
 NAME = 'OpenGymWidgets'
-BUNDLE_ID = 'ch.opengym.app.widgets'
+BUNDLE_ID = 'com.olibos.opengym.widgets'
 SHARED = %w[WorkoutActivity.swift WidgetViews.swift].freeze
 
 dir = File.expand_path('../App', __dir__)

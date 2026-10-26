@@ -26,7 +26,7 @@ struct WidgetState: Codable, Equatable {
     var lang: String?
 
     static let idle = WidgetState(mode: "idle", title: "openGym", detail: "", restEndsAt: nil)
-    static let groupId = "group.ch.opengym.app"
+    static let groupId = "group.com.olibos.opengym"
     private static let key = "widgetState"
 
     static func == (a: WidgetState, b: WidgetState) -> Bool {

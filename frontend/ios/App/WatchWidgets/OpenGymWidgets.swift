@@ -169,7 +169,7 @@ struct OpenGymWidget: Widget {
                 .environment(\.locale, entry.state.locale)
                 .containerBackground(.black, for: .widget)
                 // A tap on "Start" opens the watch app and starts today's workout.
-                .widgetURL(entry.state.mode == "today" ? URL(string: "opengym-watch://start") : URL(string: "opengym-watch://open"))
+                .widgetURL(entry.state.mode == "today" ? URL(string: "oligym-watch://start") : URL(string: "oligym-watch://open"))
         }
         .configurationDisplayName("openGym")
         .description("Your rest, your next set, or today's workout.")
@@ -227,7 +227,7 @@ struct OpenGymLauncher: Widget {
             LauncherView(entry: entry)
                 .environment(\.locale, entry.state.locale)
                 .containerBackground(.black, for: .widget)
-                .widgetURL(URL(string: "opengym-watch://open"))
+                .widgetURL(URL(string: "oligym-watch://open"))
         }
         .configurationDisplayName("openGym")
         .description("Opens openGym.")

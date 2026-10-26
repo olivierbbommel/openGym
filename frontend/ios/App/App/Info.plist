@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>openGym</string>
+	<string>OliGym</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -79,14 +79,14 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Used to record the sound of a video you take of an exercise you add yourself.</string>
 	<key>BAAppGroupID</key>
-	<string>group.ch.opengym.app</string>
+	<string>group.com.olibos.opengym</string>
 	<key>BAHasManagedAssetPacks</key>
 	<true/>
 	<key>BAUsesAppleHosting</key>
 	<true/>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>ch.opengym.app.nudge-check</string>
+		<string>com.olibos.opengym.nudge-check</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>

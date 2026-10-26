@@ -8,7 +8,7 @@
 	<array/>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.ch.opengym.app</string>
+		<string>group.com.olibos.opengym</string>
 	</array>
 </dict>
 </plist>

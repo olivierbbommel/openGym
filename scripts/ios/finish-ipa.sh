@@ -62,7 +62,7 @@ import plistlib, sys
 p = plistlib.load(open(sys.argv[1], 'rb'))
 e = dict(p['Entitlements'])
 e['get-task-allow'] = False
-assert e['application-identifier'].endswith('.ch.opengym.app'), e['application-identifier']
+assert e['application-identifier'].endswith('.com.olibos.opengym'), e['application-identifier']
 # The profile carries every capability the App ID has (HealthKit for the watch and the Health
 # step); a build whose app doesn't ask for Health yet must not claim it.
 info = plistlib.load(open(sys.argv[3], 'rb'))
@@ -90,8 +90,8 @@ import plistlib, sys
 p = plistlib.load(open(sys.argv[1], 'rb'))
 e = dict(p['Entitlements'])
 e['get-task-allow'] = False
-assert e['application-identifier'].endswith('.ch.opengym.app.AnimationPacksDownloader'), e['application-identifier']
-assert 'group.ch.opengym.app' in e.get('com.apple.security.application-groups', []), 'the extension profile has no App Group'
+assert e['application-identifier'].endswith('.com.olibos.opengym.AnimationPacksDownloader'), e['application-identifier']
+assert 'group.com.olibos.opengym' in e.get('com.apple.security.application-groups', []), 'the extension profile has no App Group'
 plistlib.dump(e, open(sys.argv[2], 'wb'))
 print('extension profile:', p['Name'], '| expires', p['ExpirationDate'])
 PY
@@ -99,7 +99,7 @@ PY
 fi
 
 # The widget extension (the widgets and the workout's Live Activity, ios/App/OpenGymWidgets): its
-# own App Store profile, given as WIDGETS_PROFILE, for ch.opengym.app.widgets with the App Group.
+# own App Store profile, given as WIDGETS_PROFILE, for com.olibos.opengym.widgets with the App Group.
 WIDGETS="$APP/PlugIns/OpenGymWidgets.appex"
 WIDGETS_SIGN=()
 if [ -d "$WIDGETS" ]; then
@@ -111,8 +111,8 @@ import plistlib, sys
 p = plistlib.load(open(sys.argv[1], 'rb'))
 e = dict(p['Entitlements'])
 e['get-task-allow'] = False
-assert e['application-identifier'].endswith('.ch.opengym.app.widgets'), e['application-identifier']
-assert 'group.ch.opengym.app' in e.get('com.apple.security.application-groups', []), 'the widgets profile has no App Group'
+assert e['application-identifier'].endswith('.com.olibos.opengym.widgets'), e['application-identifier']
+assert 'group.com.olibos.opengym' in e.get('com.apple.security.application-groups', []), 'the widgets profile has no App Group'
 plistlib.dump(e, open(sys.argv[2], 'wb'))
 print('widgets profile:', p['Name'], '| expires', p['ExpirationDate'])
 PY
@@ -132,7 +132,7 @@ import plistlib, sys
 p = plistlib.load(open(sys.argv[1], 'rb'))
 e = dict(p['Entitlements'])
 e['get-task-allow'] = False
-assert e['application-identifier'].endswith('.ch.opengym.app.watchkitapp'), e['application-identifier']
+assert e['application-identifier'].endswith('.com.olibos.opengym.watchkitapp'), e['application-identifier']
 plistlib.dump(e, open(sys.argv[2], 'wb'))
 print('watch profile:', p['Name'], '| expires', p['ExpirationDate'])
 PY
@@ -148,8 +148,8 @@ import plistlib, sys
 p = plistlib.load(open(sys.argv[1], 'rb'))
 e = dict(p['Entitlements'])
 e['get-task-allow'] = False
-assert e['application-identifier'].endswith('.ch.opengym.app.watchkitapp.widgets'), e['application-identifier']
-assert 'group.ch.opengym.app' in e.get('com.apple.security.application-groups', []), 'the widget profile has no App Group'
+assert e['application-identifier'].endswith('.com.olibos.opengym.watchkitapp.widgets'), e['application-identifier']
+assert 'group.com.olibos.opengym' in e.get('com.apple.security.application-groups', []), 'the widget profile has no App Group'
 plistlib.dump(e, open(sys.argv[2], 'wb'))
 print('watch widget profile:', p['Name'], '| expires', p['ExpirationDate'])
 PY

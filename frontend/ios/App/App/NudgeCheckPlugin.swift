@@ -31,7 +31,7 @@ public class NudgeCheckPlugin: CAPPlugin, CAPBridgedPlugin {
     ]
 
     /// Also in Info.plist (BGTaskSchedulerPermittedIdentifiers).
-    static let taskId = "ch.opengym.app.nudge-check"
+    static let taskId = "com.olibos.opengym.nudge-check"
     private static let account = "nudge-check"
 
     @objc func arm(_ call: CAPPluginCall) {
@@ -155,7 +155,7 @@ public class NudgeCheckPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private static func query() -> [String: Any] {
         return [kSecClass as String: kSecClassGenericPassword,
-                kSecAttrService as String: Bundle.main.bundleIdentifier ?? "ch.opengym.app",
+                kSecAttrService as String: Bundle.main.bundleIdentifier ?? "com.olibos.opengym",
                 kSecAttrAccount as String: account]
     }
 

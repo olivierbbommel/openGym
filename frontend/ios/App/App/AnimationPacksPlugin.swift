@@ -317,7 +317,7 @@ public class AnimationPacksPlugin: CAPPlugin, CAPBridgedPlugin {
                 monitor.cancel()
                 done.resume(returning: path.status == .satisfied && !path.isExpensive && !path.isConstrained)
             }
-            monitor.start(queue: DispatchQueue(label: "ch.opengym.app.anim-packs.path"))
+            monitor.start(queue: DispatchQueue(label: "com.olibos.opengym.anim-packs.path"))
         }
     }
 }
@@ -343,7 +343,7 @@ private final class Once: @unchecked Sendable {
 final class AnimationPackSchemeHandler: NSObject, WKURLSchemeHandler {
     static let scheme = "opengym-pack"
     private static let filePattern = try! NSRegularExpression(pattern: "^[A-Za-z0-9_-]{1,64}\\.webp$")
-    private let queue = DispatchQueue(label: "ch.opengym.app.anim-pack-files", qos: .userInitiated, attributes: .concurrent)
+    private let queue = DispatchQueue(label: "com.olibos.opengym.anim-pack-files", qos: .userInitiated, attributes: .concurrent)
     private var stopped = Set<ObjectIdentifier>()
     private let lock = NSLock()
 

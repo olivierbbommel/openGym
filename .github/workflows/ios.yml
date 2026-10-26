@@ -81,7 +81,7 @@ jobs:
           xcrun simctl install "$UDID" build/dd/Build/Products/Debug-iphonesimulator/App.app
           # A busy runner can still be starting the simulator's own apps: give the page up to eight
           # minutes to reach its plugins rather than a fixed wait.
-          xcrun simctl launch --console-pty "$UDID" ch.opengym.app > build/console.log 2>&1 &
+          xcrun simctl launch --console-pty "$UDID" com.olibos.opengym > build/console.log 2>&1 &
           for i in $(seq 96); do grep -q "RestAlert" build/console.log && break; sleep 5; done
           sleep 5
           xcrun simctl io "$UDID" screenshot build/first-screen.png || true
@@ -96,9 +96,9 @@ jobs:
         working-directory: frontend/ios/App
         run: |
           UDID=$(cat build/udid.txt)
-          xcrun simctl terminate "$UDID" ch.opengym.app 2>/dev/null || true
-          xcrun simctl launch "$UDID" ch.opengym.app -OpenGymWidgetPreview
-          DATA=$(xcrun simctl get_app_container "$UDID" ch.opengym.app data)
+          xcrun simctl terminate "$UDID" com.olibos.opengym 2>/dev/null || true
+          xcrun simctl launch "$UDID" com.olibos.opengym -OpenGymWidgetPreview
+          DATA=$(xcrun simctl get_app_container "$UDID" com.olibos.opengym data)
           for i in $(seq 60); do test -f "$DATA/Documents/widget-preview/done.txt" && break; sleep 2; done
           mkdir -p build/widgets
           cp "$DATA"/Documents/widget-preview/*.png build/widgets/ 2>/dev/null || true
@@ -132,17 +132,17 @@ jobs:
             # A synthetic clip (a square moving, made with ffmpeg for the tests; no exercise media)
             # in the app's own container, to show the animation path renders: a GIF, as the phone
             # sends it (the watch decodes what WatchBridgePlugin made, never WebP itself).
-            DATA=$(xcrun simctl get_app_container "$UDID" ch.opengym.app.watchkitapp data 2>/dev/null || true)
+            DATA=$(xcrun simctl get_app_container "$UDID" com.olibos.opengym.watchkitapp data 2>/dev/null || true)
             CLIP=""
             if [ -n "$DATA" ]; then mkdir -p "$DATA/tmp" && cp WatchCore/Tests/WatchCoreTests/Fixtures/synthetic-square.gif "$DATA/tmp/clip.gif" && CLIP="$DATA/tmp/clip.gif"; fi
             # shot <file> <screen> [-OpenGymWatchAX | -OpenGymWatchAOD]: one demo screen (SessionStore
             # startDemo: every kind of set, text only), the clip on the first exercise. Prints the pid.
             shot() {
               local file=$1 screen=$2; shift 2
-              xcrun simctl terminate "$UDID" ch.opengym.app.watchkitapp 2>/dev/null || true
+              xcrun simctl terminate "$UDID" com.olibos.opengym.watchkitapp 2>/dev/null || true
               local args=(-OpenGymWatchDemo -OpenGymWatchScreen "$screen" "$@")
               if [ -n "$CLIP" ]; then args+=(-OpenGymWatchDemoClip "$CLIP"); fi
-              PID=$(xcrun simctl launch "$UDID" ch.opengym.app.watchkitapp "${args[@]}" | awk '{print $NF}')
+              PID=$(xcrun simctl launch "$UDID" com.olibos.opengym.watchkitapp "${args[@]}" | awk '{print $NF}')
               sleep 6
               xcrun simctl io "$UDID" screenshot "build/watch/$size-$file.png" >/dev/null
             }
@@ -199,14 +199,14 @@ jobs:
             # The clock at 10:09, if this simulator lets the status bar be set.
             if xcrun simctl status_bar "$UDID" override --time "10:09" 2>build/watch-promo/status-bar-$kind.txt; then echo "$kind: status bar set" >> build/watch-promo/notes.txt; else echo "$kind: status_bar override not supported: $(cat build/watch-promo/status-bar-$kind.txt)" >> build/watch-promo/notes.txt; fi
             xcrun simctl install "$UDID" "$APP"
-            DATA=$(xcrun simctl get_app_container "$UDID" ch.opengym.app.watchkitapp data 2>/dev/null || true)
+            DATA=$(xcrun simctl get_app_container "$UDID" com.olibos.opengym.watchkitapp data 2>/dev/null || true)
             CLIP=""
             if [ -n "$DATA" ]; then mkdir -p "$DATA/tmp" && cp WatchCore/Tests/WatchCoreTests/Fixtures/synthetic-square.gif "$DATA/tmp/clip.gif" && CLIP="$DATA/tmp/clip.gif"; fi
             mkdir -p "build/watch-promo/$kind"
             promo() {
               local file=$1 screen=$2; shift 2
-              xcrun simctl terminate "$UDID" ch.opengym.app.watchkitapp 2>/dev/null || true
-              xcrun simctl launch "$UDID" ch.opengym.app.watchkitapp -OpenGymWatchDemo -OpenGymWatchScreen "$screen" "$@" >/dev/null
+              xcrun simctl terminate "$UDID" com.olibos.opengym.watchkitapp 2>/dev/null || true
+              xcrun simctl launch "$UDID" com.olibos.opengym.watchkitapp -OpenGymWatchDemo -OpenGymWatchScreen "$screen" "$@" >/dev/null
               sleep 6
               xcrun simctl io "$UDID" screenshot "build/watch-promo/$kind/$file.png" >/dev/null
             }
