@@ -353,6 +353,12 @@ export default function App() {
       patchSet: (where, fields, opts = {}) => useStore.getState().update(s => {
         patchSetIn(s, where, fields, stampWorkout, { ...opts, recount: w => { w.vol = workoutVolume(w) } })
       }),
+      // A change to a workout already saved (lib/watch-sync.js editSavedWorkout): recounted and
+      // stamped, so the next sync keeps it, as a patched set is.
+      patchWorkout: (wid, fn) => useStore.getState().update(s => {
+        const w = (s.workouts || []).find(x => x && x.id === wid)
+        if (w && fn(w)) { w.vol = workoutVolume(w); stampWorkout(w) }
+      }),
       // Ticks from the watch are the workout screen's to apply: it opens, and drains the queue.
       openWorkout: () => { if (!String(window.location.hash || '').startsWith('#/workout')) navToWorkout() },
       // Thrown away at the wrist: the phone's own Discard (nothing saved), the timers with it.

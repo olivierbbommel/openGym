@@ -360,6 +360,46 @@ export function alignToWatchRows (sets, rows) {
   })
 }
 
+/**
+ * A change to the session's shape made at the wrist, arriving after the phone saved that workout
+ * (finished here while the watch was away): applied to the saved copy, so the ticks that follow
+ * (written into it by patchSet) find their sets. Returns whether anything changed; the caller
+ * recounts and stamps the workout. Never touches a set that was done.
+ */
+export function editSavedWorkout (w, ev) {
+  if (!w || !Array.isArray(w.entries)) return false
+  const rows = rowsOf(ev.rows)
+  const fromRows = () => (rows || []).map(r => ({
+    ...(r.w != null ? { w: r.w } : {}), ...(r.r != null ? { r: r.r } : {}), ...(r.sec != null ? { sec: r.sec } : {}),
+    ...(r.min != null ? { min: r.min } : {}), ...(r.speed != null ? { speed: r.speed } : {}), done: false,
+  }))
+  const idx = entryIndexOf(w, ev)
+  if (ev.type === 'addSet') {
+    if (idx < 0 || !rows) return false
+    w.entries[idx].sets = alignToWatchRows(w.entries[idx].sets || [], rows)
+    return true
+  }
+  if (ev.type === 'removeSet') {
+    const sets = idx >= 0 ? w.entries[idx].sets || [] : []
+    if (!Number.isInteger(ev.setIdx) || !sets[ev.setIdx] || sets[ev.setIdx].done || sets.length < 2) return false
+    sets.splice(ev.setIdx, 1)
+    return true
+  }
+  if (ev.type === 'addExercise' && typeof ev.exId === 'string') {
+    const at = Number.isInteger(ev.index) ? Math.max(0, Math.min(w.entries.length, ev.index)) : w.entries.length
+    w.entries.splice(at, 0, { id: ev.exId, target: defaultConfig(ev.exId), sets: fromRows() })
+    return true
+  }
+  if (ev.type === 'swapExercise' && typeof ev.to === 'string' && idx >= 0) {
+    const old = w.entries[idx]
+    const next = { id: ev.to, target: defaultConfig(ev.to), sets: fromRows(), ...(old.rid ? { rid: old.rid } : {}), ...(old.sg ? { sg: old.sg } : {}) }
+    if ((old.sets || []).some(s => s && s.done)) w.entries.splice(idx + 1, 0, next)
+    else w.entries[idx] = next
+    return true
+  }
+  return false
+}
+
 /** The entry an event means: by position when it still holds that exercise, else by the exercise. */
 function entryIndexOf (A, ev) {
   if (A.entries[ev.entryIdx] && A.entries[ev.entryIdx].id === ev.exId) return ev.entryIdx
@@ -428,6 +468,10 @@ export function applyEvents (events, getState) {
       const idx = entryIndexOf(A, ev)
       const set = idx >= 0 ? A.entries[idx].sets?.[ev.setIdx] : null
       if (set) handlers.setDone(idx, ev.setIdx, { w: num(ev.w), r: num(ev.r), at: num(ev.at), hr: sanitizeHr(ev.hr), ...extraOf(ev) })
+    } else if (['addSet', 'removeSet', 'addExercise', 'swapExercise'].includes(ev.type) && saved) {
+      // Changed at the wrist after the phone saved it: the saved copy follows (editSavedWorkout).
+      if (!appHandlers?.patchWorkout) break
+      appHandlers.patchWorkout(ev.wid, w => editSavedWorkout(w, ev))
     } else if ((ev.type === 'addSet' || ev.type === 'removeSet') && ours) {
       // A set added or removed at the wrist: the workout screen's own Add set / remove, then the
       // rows evened out with the watch's (alignToWatchRows).

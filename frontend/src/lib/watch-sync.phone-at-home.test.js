@@ -3,7 +3,7 @@
 // changed at the wrist, a workout started empty. The snapshot carries what that needs and still
 // fits; the watch's changes come back as events the workout screen applies with its own actions.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { clipFor, libraryClipsFor, clipsMissing, readWatchClips, CLIP_LIBRARY_MAX, buildReady, buildSnapshot, buildExercises, fitSnapshot, READY_MAX, SNAPSHOT_MAX_BYTES, EXTRA_MAX, _resetWatchSync, applyEvents, bindWatchActions, bindWatchAppActions, alignToWatchRows, recentlyApplied } from './watch-sync.js'
+import { editSavedWorkout, clipFor, libraryClipsFor, clipsMissing, readWatchClips, CLIP_LIBRARY_MAX, buildReady, buildSnapshot, buildExercises, fitSnapshot, READY_MAX, SNAPSHOT_MAX_BYTES, EXTRA_MAX, _resetWatchSync, applyEvents, bindWatchActions, bindWatchAppActions, alignToWatchRows, recentlyApplied } from './watch-sync.js'
 import { swapActiveExercise } from './active-exercise-swap.js'
 import { buildCompletedWorkout } from './finish-workout.js'
 import { bestWeightForEntry } from './history.js'
@@ -274,6 +274,37 @@ describe('the animations kept on the watch for good', () => {
   it('the watch says what it keeps in its status, and only what it lacks is sent', () => {
     applyEvents([{ id: 'st1', type: 'watchStatus', health: 'on', version: '1.4.2', clips: { [withGif[0]]: 'f:x', bad: 5 }, at: 1 }], () => ({ S }))
     expect(readWatchClips()).toEqual({ [withGif[0]]: 'f:x' })
+  })
+})
+
+describe('changes from the wrist after the phone saved the workout', () => {
+  const saved = () => ({ id: 'w-0', entries: [
+    { id: '0025', sets: [{ w: 60, r: 8, done: true }, { w: 60, r: 8, done: false }] },
+    { id: '0426', sets: [{ w: 40, r: 8, done: false }] },
+  ] })
+
+  it('patch the saved copy, so the ticks after them find their sets', () => {
+    const w = saved()
+    expect(editSavedWorkout(w, { type: 'addSet', exId: '0025', entryIdx: 0, rows: [{ w: 60, r: 8 }, { w: 60, r: 8 }, { w: 62.5, r: 6 }] })).toBe(true)
+    expect(w.entries[0].sets).toHaveLength(3)
+    expect(w.entries[0].sets[2]).toEqual({ w: 62.5, r: 6, done: false })
+    expect(editSavedWorkout(w, { type: 'removeSet', exId: '0025', entryIdx: 0, setIdx: 0 })).toBe(false)   // done stays
+    expect(editSavedWorkout(w, { type: 'removeSet', exId: '0025', entryIdx: 0, setIdx: 1 })).toBe(true)
+    expect(editSavedWorkout(w, { type: 'addExercise', exId: 'treadmill', index: 9, rows: [{ min: 20, speed: 8 }] })).toBe(true)
+    expect(w.entries[2]).toMatchObject({ id: 'treadmill', sets: [{ min: 20, speed: 8, done: false }] })
+    // one with a set done keeps it, the new one goes after; one without is replaced
+    expect(editSavedWorkout(w, { type: 'swapExercise', exId: '0025', entryIdx: 0, to: '0047', rows: [{ w: 30, r: 10 }] })).toBe(true)
+    expect(w.entries.map(e => e.id)).toEqual(['0025', '0047', '0426', 'treadmill'])
+    expect(editSavedWorkout(w, { type: 'swapExercise', exId: '0426', entryIdx: 2, to: '0002', rows: [{ w: 20, r: 12 }] })).toBe(true)
+    expect(w.entries.map(e => e.id)).toEqual(['0025', '0047', '0002', 'treadmill'])
+  })
+
+  it('go through the app, which recounts and stamps the saved workout', () => {
+    const S = { active: null, workouts: [saved()] }
+    const patchWorkout = vi.fn()
+    bindWatchAppActions({ patchWorkout })
+    expect(applyEvents([{ id: 'e1', type: 'addSet', wid: 'w-0', exId: '0025', entryIdx: 0, rows: [{ w: 1, r: 1 }], at: 1 }], () => ({ S }))).toEqual(['e1'])
+    expect(patchWorkout).toHaveBeenCalledWith('w-0', expect.any(Function))
   })
 })
 
