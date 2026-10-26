@@ -58,6 +58,10 @@ const FROM_APP = {
   'Minutes': 'Minutes',
   'Speed (km/h)': 'Speed (km/h)',
   'Speed (mph)': 'Speed (mph)',
+  'Discard workout': 'Discard workout',
+  'Discard workout?': 'Discard workout?',
+  'Discard': 'Discard',
+  'The sets you logged in this session will be lost.': 'The sets you logged in this session will be lost.',
 }
 // Built from an app word: "Last time: %@".
 const COMPOSED = { 'Last time: %@': ['Last time', w => `${w}: %@`] }

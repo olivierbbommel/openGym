@@ -37,6 +37,10 @@
 "Minutes" = "Minutes";
 "Speed (km/h)" = "Speed (km/h)";
 "Speed (mph)" = "Speed (mph)";
+"Discard workout" = "Discard workout";
+"Discard workout?" = "Discard workout?";
+"Discard" = "Discard";
+"The sets you logged in this session will be lost." = "The sets you logged in this session will be lost.";
 "Last time: %@" = "Last time: %@";
 "Recent" = "Recent";
 "No workout running" = "No workout running";

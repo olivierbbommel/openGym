@@ -37,6 +37,10 @@
 "Minutes" = "Минуты";
 "Speed (km/h)" = "Скорость (км/ч)";
 "Speed (mph)" = "Скорость (миль/ч)";
+"Discard workout" = "Отменить тренировку";
+"Discard workout?" = "Отменить тренировку?";
+"Discard" = "Отменить";
+"The sets you logged in this session will be lost." = "Подходы, записанные в этой сессии, будут потеряны.";
 "Last time: %@" = "В прошлый раз: %@";
 "Recent" = "Недавние";
 "No workout running" = "Тренировка не идёт";

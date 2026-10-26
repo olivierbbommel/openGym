@@ -37,6 +37,10 @@
 "Minutes" = "分钟";
 "Speed (km/h)" = "速度（km/h）";
 "Speed (mph)" = "速度（mph）";
+"Discard workout" = "放弃训练";
+"Discard workout?" = "放弃训练？";
+"Discard" = "放弃";
+"The sets you logged in this session will be lost." = "本次记录的组数将丢失。";
 "Last time: %@" = "上次: %@";
 "Recent" = "最近";
 "No workout running" = "没有进行中的训练";

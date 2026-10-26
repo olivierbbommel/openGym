@@ -915,6 +915,8 @@ struct FinishPage: View {
     @EnvironmentObject var store: SessionStore
     @State private var confirming = false
     @State private var adding = false
+    /// Throwing the workout away, asked once more (as the phone asks).
+    @State private var discarding = false
 
     var body: some View {
         VStack(spacing: 8) {
@@ -948,11 +950,23 @@ struct FinishPage: View {
         }
         .padding(.horizontal, 6)
         .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+        // Save it, or throw it away (a try-out): nothing saved, on the watch, the phone or in Health.
         .confirmationDialog("Finish workout?", isPresented: $confirming) {
             Button("Finish and save") { store.finish() }
+            Button("Discard workout", role: .destructive) { discarding = true }
             Button("Cancel", role: .cancel) {}
         }
-        .onAppear { if SessionStore.demoScreen == "picker" { adding = true } }
+        .confirmationDialog("Discard workout?", isPresented: $discarding) {
+            Button("Discard", role: .destructive) { store.discard() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The sets you logged in this session will be lost.")
+        }
+        .onAppear {
+            if SessionStore.demoScreen == "picker" { adding = true }
+            if SessionStore.demoScreen == "finish-menu" { confirming = true }
+            if SessionStore.demoScreen == "discard" { discarding = true }
+        }
         .sheet(isPresented: $adding) {
             NavigationStack {
                 ExercisePicker(title: Text("Add exercise"), exclude: nil) { store.addExercise($0); adding = false }

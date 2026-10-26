@@ -37,6 +37,10 @@
 "Minutes" = "นาที";
 "Speed (km/h)" = "ความเร็ว (กม./ชม.)";
 "Speed (mph)" = "ความเร็ว (ไมล์/ชม.)";
+"Discard workout" = "ทิ้งการออกกำลังกายนี้";
+"Discard workout?" = "ทิ้งการออกกำลังกายนี้?";
+"Discard" = "ทิ้ง";
+"The sets you logged in this session will be lost." = "เซ็ตที่บันทึกไว้ในรอบนี้จะหายไป";
 "Last time: %@" = "ครั้งก่อน: %@";
 "Recent" = "ล่าสุด";
 "No workout running" = "ไม่มีการฝึกที่กำลังทำอยู่";

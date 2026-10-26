@@ -252,5 +252,30 @@ final class PhoneAtHomeTests: XCTestCase {
         XCTAssertEqual(Speed.label("mph"), "mph")
         XCTAssertEqual(Speed.label(nil), "km/h")
     }
+
+    /* ---------- a workout thrown away ---------- */
+
+    func testDiscardEndsTheSessionWithNothingToSaveAndAnOlderSnapshotDoesNotBringItBack() {
+        var s = running([row(60, 8, done: true, at: 1), row(60, 8)])
+        s = SessionCore.addSet(s, entry: 0, at: 2, id: "a1").0
+        let (d, ev) = SessionCore.discard(s, at: 3, id: "d1")
+        XCTAssertNil(d.workout)
+        XCTAssertTrue(d.pending.isEmpty)
+        XCTAssertNil(d.edits)
+        XCTAssertEqual(ev?["type"] as? String, "discard")
+        XCTAssertEqual(ev?["wid"] as? String, "p1")
+        let after = SessionCore.applySnapshot(d, snap(workout("p1", [row(60, 8, done: true, at: 1), row(60, 8)])))
+        XCTAssertNil(after.workout)
+        XCTAssertNil(SessionCore.discard(SessionState(), at: 1, id: "d2").1)
+    }
+
+    func testTheQueuedEventsOfADiscardedWorkoutAreFoundAndWhetherThePhoneEverHeardOfIt() {
+        let q = [#"{"id":"s","type":"start","wid":"w1"}"#, #"{"id":"b","type":"weighIn","w":80}"#,
+                 #"{"id":"t","type":"setDone","wid":"w1"}"#, #"{"id":"x","type":"setDone","wid":"w0"}"#]
+        let r = SessionCore.queued(for: "w1", in: q)
+        XCTAssertEqual(r.matches, [0, 2])
+        XCTAssertTrue(r.startQueued)
+        XCTAssertFalse(SessionCore.queued(for: "w0", in: q).startQueued)
+    }
 }
 

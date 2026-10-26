@@ -37,6 +37,10 @@
 "Minutes" = "الدقائق";
 "Speed (km/h)" = "السرعة (km/h)";
 "Speed (mph)" = "السرعة (mph)";
+"Discard workout" = "تجاهل التمرين";
+"Discard workout?" = "تجاهل التمرين؟";
+"Discard" = "تجاهل";
+"The sets you logged in this session will be lost." = "ستُفقد المجموعات التي سجلتها في هذه الجلسة.";
 "Last time: %@" = "المرة السابقة: %@";
 "Recent" = "الأخيرة";
 "No workout running" = "لا يوجد تمرين جارٍ";

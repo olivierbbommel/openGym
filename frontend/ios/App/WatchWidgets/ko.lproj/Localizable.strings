@@ -37,6 +37,10 @@
 "Minutes" = "분";
 "Speed (km/h)" = "속도 (km/h)";
 "Speed (mph)" = "속도 (mph)";
+"Discard workout" = "운동 버리기";
+"Discard workout?" = "운동을 버릴까요?";
+"Discard" = "버리기";
+"The sets you logged in this session will be lost." = "이 세션에서 기록한 세트가 사라집니다.";
 "Last time: %@" = "지난번: %@";
 "Recent" = "최근";
 "No workout running" = "진행 중인 운동이 없어요";

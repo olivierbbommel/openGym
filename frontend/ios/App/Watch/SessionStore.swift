@@ -573,6 +573,36 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         Haptics.finished()
     }
 
+    /// Throws the session away (a try-out, a mistake): nothing saved, not in Apple Health, not on
+    /// the phone. What is still queued for it is taken back; if its start is among that, the phone
+    /// never hears of it at all, else the phone is told and runs its own Discard.
+    func discard() {
+        guard let w = workout else { return }
+        let wid = w.id ?? ""
+        var startQueued = false
+        if WCSession.isSupported() {
+            let transfers = WCSession.default.outstandingUserInfoTransfers
+            let q = SessionCore.queued(for: wid, in: transfers.map { $0.userInfo["event"] as? String ?? "" })
+            startQueued = q.startQueued
+            for i in q.matches { transfers[i].cancel() }
+        }
+        let waiting = SessionCore.queued(for: wid, in: outbox)
+        if waiting.startQueued { startQueued = true }
+        outbox = outbox.enumerated().filter { !waiting.matches.contains($0.offset) }.map(\.element)
+        let (next, event) = SessionCore.discard(state, at: Date().timeIntervalSince1970 * 1000, id: UUID().uuidString)
+        if let ev = event, !startQueued { send(event: ev) }
+        // Nothing of it goes out any more, the rest's heart rate neither.
+        restAfter = nil
+        health.end(save: false)
+        stopHold()
+        skipRest()
+        dropClips()
+        summary = nil
+        state = next
+        updateLink()
+        Haptics.skip()
+    }
+
     func skipRest() {
         ackRestOver()
         closeRest(at: Date())
@@ -812,7 +842,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             case "bodyweight": self.state.entryIndex = 2
             case "side": self.state.entryIndex = 3
             case "superset": self.state.entryIndex = 4
-            case "finish": self.state.entryIndex = self.workout?.entries.count ?? 0
+            case "finish", "finish-menu", "discard": self.state.entryIndex = self.workout?.entries.count ?? 0
             case "weighin":
                 self.bodyWeight = 81.4
                 self.weighInFor = ReadySession(routineIds: ["r1"], name: "Push day", entries: [])

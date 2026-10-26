@@ -509,6 +509,36 @@ enum SessionCore {
         return (s, ["id": id, "type": "finish", "wid": w.id ?? "", "at": at])
     }
 
+    /// The session thrown away here: gone from the watch, nothing saved. Like a finish it may not
+    /// come back with a snapshot that still shows it. The event is for a phone that already has
+    /// the session (its own Discard then runs); one that never heard of it is told nothing.
+    static func discard(_ s0: SessionState, at: Double, id: String) -> (SessionState, Event?) {
+        guard let w = s0.workout else { return (s0, nil) }
+        var s = s0
+        s.workout = nil
+        s.pending = [:]
+        s.skipped = nil
+        s.edits = nil
+        s.startedHere = nil
+        if let wid = w.id { s.finishedHere = Array((s.finishedHere + [wid]).suffix(5)) }
+        return (s, ["id": id, "type": "discard", "wid": w.id ?? "", "at": at])
+    }
+
+    /// Of the events still waiting to go to the phone (JSON, oldest first), those of workout `wid`,
+    /// and whether its start is among them: then the phone has never heard of it.
+    static func queued(for wid: String, in events: [String]) -> (matches: [Int], startQueued: Bool) {
+        var matches: [Int] = []
+        var start = false
+        for (i, json) in events.enumerated() {
+            guard let data = json.data(using: .utf8),
+                  let ev = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  ev["wid"] as? String == wid else { continue }
+            matches.append(i)
+            if ev["type"] as? String == "start" { start = true }
+        }
+        return (matches, start)
+    }
+
     /// The set to do next in an exercise: the one picked, or the first not done.
     static func setIndex(_ s: SessionState, entry ei: Int, picked: Int? = nil) -> Int? {
         guard let w = s.workout, w.entries.indices.contains(ei) else { return nil }

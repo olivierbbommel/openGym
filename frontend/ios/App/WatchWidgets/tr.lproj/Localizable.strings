@@ -37,6 +37,10 @@
 "Minutes" = "Dakika";
 "Speed (km/h)" = "Hız (km/sa)";
 "Speed (mph)" = "Hız (mil/sa)";
+"Discard workout" = "Antrenmanı iptal et";
+"Discard workout?" = "Antrenman iptal edilsin mi?";
+"Discard" = "Vazgeç";
+"The sets you logged in this session will be lost." = "Bu oturumda kaydettiğin setler kaybolacak.";
 "Last time: %@" = "Geçen sefer: %@";
 "Recent" = "Son kullanılanlar";
 "No workout running" = "Devam eden antrenman yok";

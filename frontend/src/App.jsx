@@ -10,7 +10,7 @@ import { setLang, useLang, baseLang } from './lib/i18n.js'
 import { effectiveLang } from './lib/default-lang.js'
 import { setPlayOnSilent, setVibrate, setAlarmBuzzer, setNativeBuzzer } from './lib/sound.js'
 import { buzzAsAlarm } from './lib/rest-alert.js'
-import { setNav, notePath, keyBefore, navToWorkout } from './lib/nav.js'
+import { setNav, notePath, keyBefore, navToWorkout, nav } from './lib/nav.js'
 import { workoutVolume } from './lib/history.js'
 import { setSystemBarsLight } from './lib/system-bars.js'
 import { initBackButton } from './lib/back.js'
@@ -355,6 +355,15 @@ export default function App() {
       }),
       // Ticks from the watch are the workout screen's to apply: it opens, and drains the queue.
       openWorkout: () => { if (!String(window.location.hash || '').startsWith('#/workout')) navToWorkout() },
+      // Thrown away at the wrist: the phone's own Discard (nothing saved), the timers with it.
+      discard: wid => {
+        const A = useStore.getState().S.active
+        if (!A || A.id !== wid || A.editingWorkoutId) return
+        useStore.getState().update(s => { s.active = null })
+        useUI.getState().stopRest()
+        useUI.getState().stopWork?.()
+        if (String(window.location.hash || '').startsWith('#/workout')) nav('/home')
+      },
     })
     return () => { gone = true; stop?.(); unbind() }
   }, [])

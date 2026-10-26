@@ -37,6 +37,10 @@
 "Minutes" = "Хвилини";
 "Speed (km/h)" = "Швидкість (км/год)";
 "Speed (mph)" = "Швидкість (миль/год)";
+"Discard workout" = "Скасувати тренування";
+"Discard workout?" = "Скасувати тренування?";
+"Discard" = "Скасувати";
+"The sets you logged in this session will be lost." = "Підходи, записані в цій сесії, буде втрачено.";
 "Last time: %@" = "Минулого разу: %@";
 "Recent" = "Нещодавні";
 "No workout running" = "Тренування не триває";

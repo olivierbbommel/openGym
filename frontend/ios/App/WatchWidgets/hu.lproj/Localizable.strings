@@ -37,6 +37,10 @@
 "Minutes" = "Perc";
 "Speed (km/h)" = "Sebesség (km/h)";
 "Speed (mph)" = "Sebesség (mph)";
+"Discard workout" = "Edzés elvetése";
+"Discard workout?" = "Elveted az edzést?";
+"Discard" = "Elvetés";
+"The sets you logged in this session will be lost." = "Az ebben az edzésben rögzített sorozatok elvesznek.";
 "Last time: %@" = "Legutóbb: %@";
 "Recent" = "Legutóbbiak";
 "No workout running" = "Nincs folyamatban edzés";

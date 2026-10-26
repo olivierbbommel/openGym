@@ -316,6 +316,7 @@ function entryIndexOf (A, ev) {
  *   start   { routineIds, wid, at }  the app starts that session with the watch's id and start
  *   setDone { wid, exId, entryIdx, setIdx, w, r, at }   the workout screen's own tick
  *   finish  { wid, at }              the workout screen's own Finish and save
+ *   discard { wid, at }              the app's own Discard: the session goes, nothing saved
  *   setHr   { wid, exId, entryIdx, setIdx, hr?, restHr? }   heart rate on a set (lib/heart-rate.js)
  *   addSet    { wid, exId, entryIdx, rows }            the workout screen's own Add set
  *   removeSet { wid, exId, entryIdx, setIdx, rows }    its own remove, a set not done only
@@ -418,6 +419,11 @@ export function applyEvents (events, getState) {
         if (!appHandlers) break
         appHandlers.patchSet({ wid: ev.wid, exId: ev.exId, entryIdx: ev.entryIdx, setIdx: ev.setIdx }, fields)
       }
+    } else if (ev.type === 'discard' && ours) {
+      // Thrown away at the wrist: the app's own Discard, nothing saved. A workout already saved here
+      // (finished on the phone meanwhile) is the phone's to keep or delete.
+      if (!appHandlers?.discard) break
+      appHandlers.discard(A.id)
     } else if (ev.type === 'finish' && ours) {
       if (!handlers) {
         if (appHandlers?.openWorkout) appHandlers.openWorkout()

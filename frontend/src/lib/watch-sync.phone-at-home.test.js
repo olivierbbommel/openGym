@@ -219,3 +219,22 @@ describe('cardio at the wrist', () => {
   })
 })
 
+
+describe('a workout thrown away at the wrist', () => {
+  it('runs the app\'s own Discard for the running session, and nothing for another', () => {
+    const S = { active: { id: 'w-1', entries: [] }, workouts: [{ id: 'w-0', entries: [] }] }
+    const discard = vi.fn()
+    bindWatchAppActions({ discard })
+    expect(applyEvents([
+      { id: 'd1', type: 'discard', wid: 'w-1', at: 1 },
+      { id: 'd0', type: 'discard', wid: 'w-0', at: 2 },   // saved here meanwhile: the phone's to keep
+    ], () => ({ S }))).toEqual(['d1', 'd0'])
+    expect(discard).toHaveBeenCalledTimes(1)
+    expect(discard).toHaveBeenCalledWith('w-1')
+  })
+
+  it('waits until the app\'s actions are there', () => {
+    const S = { active: { id: 'w-1', entries: [] } }
+    expect(applyEvents([{ id: 'd2', type: 'discard', wid: 'w-1', at: 1 }], () => ({ S }))).toEqual([])
+  })
+})

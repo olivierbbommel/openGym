@@ -37,6 +37,10 @@
 "Minutes" = "Minutes";
 "Speed (km/h)" = "Vitesse (km/h)";
 "Speed (mph)" = "Vitesse (mph)";
+"Discard workout" = "Abandonner la séance";
+"Discard workout?" = "Abandonner la séance ?";
+"Discard" = "Abandonner";
+"The sets you logged in this session will be lost." = "Les séries notées dans cette session seront perdues.";
 "Last time: %@" = "La dernière fois: %@";
 "Recent" = "Récents";
 "No workout running" = "Aucune séance en cours";

@@ -37,6 +37,10 @@
 "Minutes" = "Minuten";
 "Speed (km/h)" = "Tempo (km/h)";
 "Speed (mph)" = "Tempo (mph)";
+"Discard workout" = "Training verwerfen";
+"Discard workout?" = "Training verwerfen?";
+"Discard" = "Verwerfen";
+"The sets you logged in this session will be lost." = "Die in dieser Einheit eingetragenen Sätze gehen verloren.";
 "Last time: %@" = "Letztes Mal: %@";
 "Recent" = "Zuletzt";
 "No workout running" = "Kein Training läuft";
