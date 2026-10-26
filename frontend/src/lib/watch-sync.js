@@ -758,7 +758,8 @@ export function watchExtras (S) {
 
 export async function startWatchSync ({ useStore, useUI }) {
   const p = await watchPlugin()
-  if (!p) return () => {}
+  // No watch link here (Android): the profile's inbox all the same.
+  if (!p) return startInboxSync({ useStore })
   getStateRef = () => useStore.getState()
   let lastSent = null, lastClips = null, lastLibrary = null, tm = null
   // The ready sessions only change with the plan, the log or the day: built again only then.
@@ -866,6 +867,21 @@ export async function startWatchSync ({ useStore, useUI }) {
   schedule()
   drainWatchEvents()
   return () => { offStore(); offUI(); offPrefs(); offHealth(); offLang(); sub?.remove?.(); subLink?.remove?.(); document.removeEventListener('visibilitychange', onVisible); clearTimeout(tm) }
+}
+
+/**
+ * Where there is no watch link (the web, Android): only the events the watch wrote into the profile
+ * with the phone at home (lib/watch-inbox.js), applied when the profile brings them, by the same
+ * drain and actions as on the phone. Returns the stop.
+ */
+export function startInboxSync ({ useStore }) {
+  getStateRef = () => useStore.getState()
+  const off = useStore.subscribe((s, prev) => {
+    if (s.ready && !prev.ready) drainWatchEvents()
+    else if (s.S !== prev.S && s.S?.watchInbox !== prev.S?.watchInbox && s.S?.watchInbox?.length) drainWatchEvents()
+  })
+  drainWatchEvents()
+  return () => { off(); getStateRef = null }
 }
 
 // Test seams.

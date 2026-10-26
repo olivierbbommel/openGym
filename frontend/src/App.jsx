@@ -15,7 +15,7 @@ import { workoutVolume } from './lib/history.js'
 import { setSystemBarsLight } from './lib/system-bars.js'
 import { initBackButton } from './lib/back.js'
 import { installEdgeSwipeBack, BACK_PREVIEW_EVENT } from './lib/edge-swipe-back.js'
-import { startWatchSync, bindWatchAppActions, patchSetIn } from './lib/watch-sync.js'
+import { startWatchSync, startInboxSync, bindWatchAppActions, patchSetIn } from './lib/watch-sync.js'
 import { stampWorkout } from './lib/sync-merge.js'
 import { logWeighIn } from './lib/bodyweight.js'
 import { startWidgetSync } from './lib/widgets.js'
@@ -336,11 +336,12 @@ export default function App() {
   // iOS: swipe from the left edge for the page's own back button (lib/edge-swipe-back.js)
   useEffect(() => installEdgeSwipeBack(), [])
   // iPhone app with an Apple Watch: the running workout goes to the watch, its ticks come back
-  // (lib/watch-sync.js). Nothing at all on the web, on Android, or without a paired watch.
+  // (lib/watch-sync.js). Elsewhere (the web, Android) only what the watch wrote into the profile
+  // with the phone at home (lib/watch-inbox.js): applied the same way, with the same actions.
   useEffect(() => {
-    if (!MOBILE) return
     let stop = null, gone = false
-    startWatchSync({ useStore, useUI }).then(fn => { if (gone) fn(); else stop = fn })
+    if (MOBILE) startWatchSync({ useStore, useUI }).then(fn => { if (gone) fn(); else stop = fn })
+    else stop = startInboxSync({ useStore })
     // A session started on the watch starts here as the phone's Start does, with the watch's id
     // and start time, and no weigh-in question (the lifter is at the watch, not here).
     const unbind = bindWatchAppActions({

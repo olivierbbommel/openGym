@@ -2,7 +2,7 @@
 // The watch's events by way of the server (lib/watch-inbox.js): the phone applies what the watch
 // wrote into the profile as it applies the native queue, once per event, and clears them there.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { _resetWatchSync, _setWatchPluginForTest, applyEvents, bindWatchAppActions, drainWatchEvents } from './watch-sync.js'
+import { _resetWatchSync, _setWatchPluginForTest, applyEvents, bindWatchAppActions, drainWatchEvents, startInboxSync } from './watch-sync.js'
 import { markInboxDone } from './watch-inbox.js'
 
 // A store as small as the drain needs: S, update (immer-free: the function mutates a copy), saveNow.
@@ -76,5 +76,32 @@ describe('the watch\'s events from the server', () => {
     const s = { watchInbox: [{ id: 'a', seq: 1, type: 'start' }, { id: 'b', seq: 2, type: 'setDone' }] }
     markInboxDone(s, ['a'])
     expect(s.watchInbox.map(e => e.id)).toEqual(['b'])
+  })
+})
+
+describe('the web, with no watch link', () => {
+  it('applies the inbox when the profile brings it, and stops when told', async () => {
+    let state = { S: { workouts: [] }, ready: true }
+    const subs = new Set()
+    const useStore = {
+      getState: () => state,
+      subscribe: fn => { subs.add(fn); return () => subs.delete(fn) },
+    }
+    state.update = fn => { const next = structuredClone(state.S); fn(next); const prev = state; state = { ...state, S: next }; subs.forEach(f => f(state, prev)) }
+    state.saveNow = async () => {}
+    _setWatchPluginForTest(null, () => state)
+    const weighIn = vi.fn()
+    bindWatchAppActions({ weighIn })
+    const stop = startInboxSync({ useStore })
+    // the server's copy arrives with an event the watch wrote
+    const prev = state
+    state = { ...state, S: { workouts: [], watchInbox: [{ id: 'w1', seq: 1, type: 'weighIn', w: 81, at: 7 }] } }
+    subs.forEach(f => f(state, prev))
+    await new Promise(r => setTimeout(r, 0))
+    await drainWatchEvents()
+    expect(weighIn).toHaveBeenCalledTimes(1)
+    expect(state.S.watchInboxDone).toEqual(['w1'])
+    stop()
+    expect(subs.size).toBe(0)
   })
 })
