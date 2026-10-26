@@ -26,6 +26,7 @@ import { fetchToStore, mayFetch } from '../lib/media-sync.js'
 import { prefetchAllowed } from '../lib/media-prefetch.js'
 import { LOOP_MAX_SEC } from '../lib/media-limits.js'
 import Icon from './Icon.jsx'
+import { useWorkoutMediaSize } from './media-size.js'
 
 /** Opens a link after a tap: sanitised again here, since plan files and backups can bring any
  *  string in, and in a new browsing context with no opener and no Referer. */
@@ -132,16 +133,13 @@ export function LinkCard({ url, compact, mini }) {
 /* ------------------------------------------------------------------ the big picture ------- */
 
 export default function CustomMedia({ ex, id, compact, minimizable }) {
-  const gifSize = useStore(s => s.S.gifSize)
-  const update = useStore(s => s.update)
+  const { mini, toggleSize, off } = useWorkoutMediaSize(minimizable)
   // The workout's list layout, from the store: only the workout card is minimizable.
   const listLayout = useStore(s => !!minimizable && ((s.S.active?.workoutView || s.S.workoutView) === 'list'))
   const m = mediaOf(ex)
   const link = cleanUrl(ex?.url)
   if (!m && !link) return null
-  if (minimizable && gifSize === 'off') return null
-  const mini = !!minimizable && gifSize === 'mini'
-  const toggleSize = e => { e.stopPropagation(); update(s => { s.gifSize = mini ? 'full' : 'mini' }) }
+  if (off) return null
   const toggle = minimizable
     ? <button className="giftoggle" onClick={toggleSize}><Icon name={mini ? 'expand' : 'minimize'} />{mini ? t('Expand') : t('Minimize')}</button>
     : null

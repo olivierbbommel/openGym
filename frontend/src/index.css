@@ -2174,3 +2174,26 @@ button.wl-summary{width:100%;padding:0 0 10px;text-align:start;border-radius:var
   left:calc(-1 * var(--eb-l,0px));right:calc(-1 * var(--eb-r,0px));
   box-shadow:0 0 28px rgba(0,0,0,.28);
 }
+
+/* ------------------------------------------------- the tab bar on the side -- */
+/* A short, wide screen (the folded iPhone Duo, a phone held sideways): the tab bar is a column on
+   the right, as the system puts its own bars there on such a screen ("Designing for iPhone Duo":
+   toolbars and tab bars move to the side to keep the height for content), and the content keeps
+   the whole height. On the Duo the column sits in the strip beside its status pill (--sar).
+   Narrow phones (the SE) keep the bar at the bottom: a column would take a fifth of their width. */
+@media (max-height:760px) and (min-width:440px){
+  :root{--rail:max(72px,var(--sar))}
+  #tabbar{
+    inset-inline-start:auto;inset-inline-end:auto;top:0;bottom:0;left:auto;right:0;width:var(--rail);
+    flex-direction:column;justify-content:center;align-items:stretch;gap:4px;
+    padding:calc(var(--sat) + 8px) 0 calc(var(--sab) + 8px);
+    border-top:none;border-left:var(--hair) solid var(--sep-op);
+  }
+  #tabbar button{flex:0 0 auto;padding:6px 0}
+  #tabbar button.start{margin-top:0}
+  body:not(.no-tabbar) #app{padding-right:calc(var(--pad) + var(--rail));padding-bottom:calc(24px + var(--sab))}
+  body.resting:not(.no-tabbar) #app{padding-bottom:calc(96px + var(--sab))}
+  body:not(.no-tabbar) .conn-bar{padding-right:calc(var(--pad) + var(--rail))}
+  body:not(.no-tabbar) #timer{right:calc(12px + var(--rail));bottom:calc(12px + var(--sab))}
+  body:not(.no-tabbar) #toast{bottom:calc(24px + var(--sab));left:calc((100% - var(--rail) + var(--sal)) / 2)}
+}

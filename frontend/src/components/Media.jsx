@@ -6,6 +6,7 @@ import { t, exerciseNameFor } from '../lib/i18n.js'
 import Icon from './Icon.jsx'
 import CustomMedia, { CustomThumb } from './CustomMedia.jsx'
 import { useAnimSources } from './Animations.jsx'
+import { useWorkoutMediaSize } from './media-size.js'
 
 // An exercise's picture, wherever one shows. A custom exercise goes to CustomMedia.jsx — its own
 // photo, GIF, video or link, from the local media store — and never through imgSrc/gifSrc, which
@@ -29,9 +30,8 @@ function BuiltinMedia({ ex, id, compact, minimizable }) {
   // on a white block. Now the still stands in for the animation, a neutral tile stands in for
   // both, and a tap tries again — no text, so nothing new to translate.
   const [failed, setFailed] = useState(null)
-  const gifSize = useStore(s => s.S.gifSize)
+  const { mini: miniSize, toggleSize, off } = useWorkoutMediaSize(minimizable)
   const body = useStore(s => figureOf(s.S))
-  const update = useStore(s => s.update)
   // In the store apps the animation may come from a downloaded pack at the chosen quality
   // (Settings → Animation quality, components/Animations.jsx): the sources are the best file
   // first and the built-in one last, and one that will not load hands over to the next before the
@@ -44,9 +44,8 @@ function BuiltinMedia({ ex, id, compact, minimizable }) {
   const clip = ex.gif && isVideoSrc(gif) ? gif : null
   const clipSrc = useClipInMemory(clip)
   if (!ex.gif) return null
-  if (minimizable && gifSize === 'off') return null
-  const mini = minimizable && gifSize === 'mini'
-  const toggleSize = e => { e.stopPropagation(); update(s => { s.gifSize = mini ? 'full' : 'mini' }) }
+  if (off) return null
+  const mini = miniSize
   const showGif = playing && failed == null && !anim.still
   const onError = () => {
     if (showGif && at < anim.sources.length - 1) { setTried({ key: sourcesKey, i: at + 1 }); return }
