@@ -3,7 +3,7 @@
 // changed at the wrist, a workout started empty. The snapshot carries what that needs and still
 // fits; the watch's changes come back as events the workout screen applies with its own actions.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { buildReady, buildSnapshot, buildExercises, fitSnapshot, READY_MAX, SNAPSHOT_MAX_BYTES, EXTRA_MAX, _resetWatchSync, applyEvents, bindWatchActions, alignToWatchRows, recentlyApplied } from './watch-sync.js'
+import { buildReady, buildSnapshot, buildExercises, fitSnapshot, READY_MAX, SNAPSHOT_MAX_BYTES, EXTRA_MAX, _resetWatchSync, applyEvents, bindWatchActions, bindWatchAppActions, alignToWatchRows, recentlyApplied } from './watch-sync.js'
 import { swapActiveExercise } from './active-exercise-swap.js'
 import { buildCompletedWorkout } from './finish-workout.js'
 import { bestWeightForEntry } from './history.js'
@@ -170,5 +170,21 @@ describe('exercises to add or swap in at the wrist', () => {
     expect(w.entries[1].sets.filter(s => s.done)).toHaveLength(3)
     // what Finish takes into exWeights (next time's starting weight) for the swapped-in exercise
     expect(bestWeightForEntry(w.entries[1])).toBe(32.5)
+  })
+})
+
+describe('a workout started empty at the wrist', () => {
+  it('starts on the phone as its Freestyle (no routine), and the exercises the watch adds follow it', () => {
+    let S = { active: null }
+    const start = vi.fn((ids, opts) => { S = { active: { id: opts.id, entries: [] } } })
+    bindWatchAppActions({ start })
+    const addExercise = vi.fn()
+    bindWatchActions({ addExercise })
+    expect(applyEvents([
+      { id: 'f1', type: 'start', routineIds: [], wid: 'watch-9', at: 5 },
+      { id: 'f2', type: 'addExercise', wid: 'watch-9', exId: '0001', index: 0, rows: [{ w: 20, r: 10 }], at: 6 },
+    ], () => ({ S }))).toEqual(['f1', 'f2'])
+    expect(start).toHaveBeenCalledWith([], { id: 'watch-9', start: 5 })
+    expect(addExercise).toHaveBeenCalledWith('0001', 0, expect.any(Array))
   })
 })

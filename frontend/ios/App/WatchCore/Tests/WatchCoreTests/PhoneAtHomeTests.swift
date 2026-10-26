@@ -189,5 +189,22 @@ final class PhoneAtHomeTests: XCTestCase {
         XCTAssertEqual(s.workout?.entries.map(\.id), before)
         XCTAssertNil(s.edits)
     }
+
+    /* ---------- a workout started empty ---------- */
+
+    func testAFreestyleStartIsAnEmptySessionThePhoneStartsAsFreestyleAndExercisesGoInFromTheFinishPage() {
+        let (s0, ev) = SessionCore.start(SessionState(), ReadySession(routineIds: [], name: "Freestyle", entries: []), wid: "watch-1", at: 1, id: "s1")
+        XCTAssertEqual(ev["routineIds"] as? [String], [])
+        XCTAssertEqual(s0.workout?.entries.count, 0)
+        XCTAssertEqual(s0.entryIndex, 0, "the Finish page, the only one")
+        let s1 = SessionCore.addExercise(s0, entry("fly", [row(12, 12)]), at: 2, id: "x1").0
+        XCTAssertEqual(s1.workout?.entries.map(\.id), ["fly"])
+        XCTAssertEqual(s1.entryIndex, 0)
+        let s2 = SessionCore.addExercise(s1, entry("row", [row(40, 10)]), at: 3, id: "x2").0
+        XCTAssertEqual(s2.workout?.entries.map(\.id), ["fly", "row"])
+        // started here and not confirmed yet: a snapshot without it keeps it, changes and all
+        let s3 = SessionCore.applySnapshot(s2, Snapshot(v: 1, unit: "kg", restSec: 90, active: nil, ready: nil, settings: nil, applied: []))
+        XCTAssertEqual(s3.workout?.entries.map(\.id), ["fly", "row"])
+    }
 }
 

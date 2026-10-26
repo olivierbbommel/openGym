@@ -456,6 +456,11 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         begin(session, bw: nil)
     }
 
+    /// An empty session, built exercise by exercise here (the phone's Freestyle: no routine).
+    func startFreestyle() {
+        start(ReadySession(routineIds: [], name: L("Freestyle"), entries: []))
+    }
+
     /// The weigh-in answered: saved (a weigh-in for the phone, and the session's body weight) or
     /// skipped; the workout starts either way. `nil` session: cancelled, nothing starts.
     func finishWeighIn(save: Bool) {

@@ -238,6 +238,19 @@ struct IdleView: View {
                         }
                         .padding(.top, 6)
                     }
+                    // An empty workout, its exercises picked as you go (the phone's Freestyle).
+                    Button { store.startFreestyle() } label: {
+                        HStack {
+                            Text("Freestyle").lineLimit(1).minimumScaleFactor(0.8)
+                            Spacer(minLength: 4)
+                            Image(systemName: "plus").font(.caption2).foregroundStyle(.secondary)
+                        }
+                        .frame(minHeight: Theme.tap)
+                        .padding(.horizontal, 10)
+                        .background(RoundedRectangle(cornerRadius: 12).stroke(Theme.dim, lineWidth: 1.5))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, ready.others.isEmpty ? 6 : 0)
                 }
                 .padding(.horizontal, 4)
             }
@@ -880,14 +893,20 @@ struct FinishPage: View {
                 .font(.system(.footnote, design: .rounded).weight(.semibold))
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
-            RoundButton(systemImage: "flag.checkered", label: Text("Finish workout")) { confirming = true }
+            // An empty workout (started as Freestyle) has one thing to do first: add an exercise.
+            let empty = store.workout?.entries.isEmpty ?? true
+            if empty {
+                RoundButton(systemImage: "plus", label: Text("Add exercise")) { adding = true }
+            } else {
+                RoundButton(systemImage: "flag.checkered", label: Text("Finish workout")) { confirming = true }
+            }
             let p = store.progress
             if p.total > 0 {
                 Text("\(p.done) of \(p.total) sets").font(.caption2).foregroundStyle(.secondary)
             }
-            // One more exercise after the last, the phone at home or not.
-            Button { adding = true } label: {
-                Label { Text("Add exercise") } icon: { Image(systemName: "plus") }
+            // One more exercise after the last, the phone at home or not; or, still empty, the end.
+            Button { if empty { confirming = true } else { adding = true } } label: {
+                Label { empty ? Text("Finish workout") : Text("Add exercise") } icon: { Image(systemName: empty ? "flag.checkered" : "plus") }
                     .font(.footnote.weight(.semibold))
                     .padding(.horizontal, 12)
                     .frame(minHeight: 36)
