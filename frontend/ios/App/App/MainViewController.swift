@@ -15,6 +15,11 @@ class MainViewController: CAPBridgeViewController {
     override open func webViewConfiguration(for instanceConfiguration: InstanceConfiguration) -> WKWebViewConfiguration {
         let config = super.webViewConfiguration(for: instanceConfiguration)
         config.setURLSchemeHandler(packFiles, forURLScheme: AnimationPackSchemeHandler.scheme)
+        // Settings → Accessibility → Reduce Transparency, which a web view's CSS cannot see: the
+        // page's glass (index.css, Liquid Glass) turns solid on :root[data-reduce-transparency].
+        config.userContentController.addUserScript(WKUserScript(
+            source: MainViewController.transparencyScript(UIAccessibility.isReduceTransparencyEnabled),
+            injectionTime: .atDocumentStart, forMainFrameOnly: true))
         return config
     }
 
@@ -29,6 +34,11 @@ class MainViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(WidgetBridgePlugin())
         bridge?.registerPluginInstance(LiveActivityPlugin())
         WidgetPreview.runIfAsked()
+        // Switched while the app runs: the page follows at once.
+        NotificationCenter.default.addObserver(forName: UIAccessibility.reduceTransparencyStatusDidChangeNotification,
+                                               object: nil, queue: .main) { [weak self] _ in
+            self?.webView?.evaluateJavaScript(MainViewController.transparencyScript(UIAccessibility.isReduceTransparencyEnabled))
+        }
         // After loadView has finished: the view is the web view only once it has.
         if ProcessInfo.processInfo.arguments.contains(MainViewController.pendingProbeArgument) {
             DispatchQueue.main.async { [weak self] in self?.showPendingProbe() }
@@ -43,6 +53,11 @@ class MainViewController: CAPBridgeViewController {
      * nothing but XCUIApplication.launchArguments passes the argument.
      */
     static let pendingProbeArgument = "-OpenGymUITestPending"
+
+    /// The page told whether Reduce Transparency is on.
+    static func transparencyScript(_ on: Bool) -> String {
+        "document.documentElement.toggleAttribute('data-reduce-transparency', \(on))"
+    }
 
     private func showPendingProbe() {
         // On the window, not inside the web view: what a WKWebView holds is its page as far as

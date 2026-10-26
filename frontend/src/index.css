@@ -2175,6 +2175,65 @@ button.wl-summary{width:100%;padding:0 0 10px;text-align:start;border-radius:var
   box-shadow:0 0 28px rgba(0,0,0,.28);
 }
 
+/* ------------------------------------------------------------ Liquid Glass -- */
+/* The floating layer only, as Apple has it: the tab bar, the workout's pinned header, the
+   connection bar and the sheets; never the cards and lists, which stay the content. More
+   see-through and blurred harder than before (iOS 26), a hairline of light along the edge, and a
+   soft fade where the content runs under a bar instead of a hard line. The rest timer keeps its
+   nearly opaque fill (its clock has to read over the set rows) and takes only the edge. With
+   Increase Contrast, or Reduce Transparency (passed in by the iPhone app: MainViewController),
+   every surface is solid again. */
+:root{
+  --glass:color-mix(in srgb,var(--bg-el) 70%,transparent);
+  --glass-top:color-mix(in srgb,var(--bg) 72%,transparent);
+  --glass-sheet:color-mix(in srgb,var(--bg-el) 88%,transparent);
+  --glass-blur:saturate(170%) blur(28px);
+  --glass-edge:inset 0 .5px 0 rgba(255,255,255,.13);
+  --glass-fade:color-mix(in srgb,var(--bg) 75%,transparent);
+}
+:root[data-theme="light"]{
+  --glass:rgba(249,249,251,.7);
+  --glass-top:rgba(255,255,255,.72);
+  --glass-sheet:rgba(249,249,251,.9);
+  --glass-edge:inset 0 .5px 0 rgba(255,255,255,.85),0 0 0 .5px rgba(0,0,0,.06);
+}
+#tabbar,:root[data-theme="light"] #tabbar{
+  background:var(--glass);border-top:none;box-shadow:var(--glass-edge);
+  -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
+}
+#tabbar::before{
+  content:"";position:absolute;inset-inline:0;bottom:100%;height:22px;pointer-events:none;
+  background:linear-gradient(to top,var(--glass-fade),transparent);
+}
+.whdr.stick,.conn-bar{
+  background:var(--glass-top);box-shadow:var(--glass-edge);
+  -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
+}
+.whdr.stick::after{
+  content:"";position:absolute;inset-inline:0;top:100%;height:18px;pointer-events:none;
+  background:linear-gradient(to bottom,var(--glass-fade),transparent);
+}
+.sheet,:root[data-theme="light"] .sheet{
+  background:var(--glass-sheet);box-shadow:var(--glass-edge);
+  -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
+}
+#timer{box-shadow:var(--glass-edge),0 12px 34px -8px rgba(0,0,0,.55)}
+/* Solid again: Increase Contrast, Reduce Transparency, or no backdrop blur at all. */
+@media (prefers-contrast:more){
+  :root{--glass:var(--bg-el);--glass-top:var(--bg);--glass-sheet:var(--bg-el);--glass-fade:transparent}
+  #tabbar,.whdr.stick,.conn-bar,.sheet{-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:0 0 0 1px var(--sep-op)}
+}
+@media (prefers-reduced-transparency:reduce){
+  :root{--glass:var(--bg-el);--glass-top:var(--bg);--glass-sheet:var(--bg-el);--glass-fade:transparent}
+  #tabbar,.whdr.stick,.conn-bar,.sheet{-webkit-backdrop-filter:none;backdrop-filter:none}
+}
+:root[data-reduce-transparency]{--glass:var(--bg-el);--glass-top:var(--bg);--glass-sheet:var(--bg-el);--glass-fade:transparent}
+:root[data-reduce-transparency] #tabbar,:root[data-reduce-transparency] .whdr.stick,
+:root[data-reduce-transparency] .conn-bar,:root[data-reduce-transparency] .sheet{-webkit-backdrop-filter:none;backdrop-filter:none}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  :root{--glass:var(--bg-el);--glass-top:var(--bg);--glass-sheet:var(--bg-el)}
+}
+
 /* ------------------------------------------------- the tab bar on the side -- */
 /* A short, wide screen (the folded iPhone Duo, a phone held sideways): the tab bar is a column on
    the right, as the system puts its own bars there on such a screen ("Designing for iPhone Duo":
@@ -2191,6 +2250,8 @@ button.wl-summary{width:100%;padding:0 0 10px;text-align:start;border-radius:var
   }
   #tabbar button{flex:0 0 auto;padding:6px 0}
   #tabbar button.start{margin-top:0}
+  #tabbar::before{inset-inline:auto;left:auto;right:100%;top:0;bottom:0;width:18px;height:auto;
+    background:linear-gradient(to left,var(--glass-fade),transparent)}
   body:not(.no-tabbar) #app{padding-right:calc(var(--pad) + var(--rail));padding-bottom:calc(24px + var(--sab))}
   body.resting:not(.no-tabbar) #app{padding-bottom:calc(96px + var(--sab))}
   body:not(.no-tabbar) .conn-bar{padding-right:calc(var(--pad) + var(--rail))}
