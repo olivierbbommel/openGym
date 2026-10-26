@@ -145,7 +145,7 @@ struct WidgetView: View {
                 } else {
                     HStack(spacing: 6) {
                         OpenGymLogo().frame(width: 26, height: 16)
-                        Text(verbatim: "openGym").font(.headline)
+                        Text(verbatim: "OliGym").font(.headline)
                     }
                 }
             }
@@ -171,7 +171,7 @@ struct OpenGymWidget: Widget {
                 // A tap on "Start" opens the watch app and starts today's workout.
                 .widgetURL(entry.state.mode == "today" ? URL(string: "oligym-watch://start") : URL(string: "oligym-watch://open"))
         }
-        .configurationDisplayName("openGym")
+        .configurationDisplayName("OliGym")
         .description("Your rest, your next set, or today's workout.")
         .supportedFamilies([.accessoryRectangular, .accessoryCircular, .accessoryInline, .accessoryCorner])
     }
@@ -203,14 +203,14 @@ struct LauncherView: View {
         case .accessoryCorner:
             OpenGymLogo()
                 .padding(4)
-                .widgetLabel { Text(verbatim: "openGym") }
+                .widgetLabel { Text(verbatim: "OliGym") }
         case .accessoryInline:
-            Text(verbatim: "openGym")
+            Text(verbatim: "OliGym")
         default:
             HStack(spacing: 8) {
                 OpenGymLogo().frame(width: 30, height: 20)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(verbatim: "openGym").font(.headline)
+                    Text(verbatim: "OliGym").font(.headline)
                     if entry.state.mode == "today" {
                         Text(verbatim: entry.state.title).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                     }
@@ -229,8 +229,8 @@ struct OpenGymLauncher: Widget {
                 .containerBackground(.black, for: .widget)
                 .widgetURL(URL(string: "oligym-watch://open"))
         }
-        .configurationDisplayName("openGym")
-        .description("Opens openGym.")
+        .configurationDisplayName("OliGym")
+        .description("Opens OliGym.")
         .supportedFamilies([.accessoryCircular, .accessoryCorner, .accessoryInline, .accessoryRectangular])
     }
 }
