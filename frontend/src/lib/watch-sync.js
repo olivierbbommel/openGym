@@ -33,8 +33,10 @@ export const SNAPSHOT_VERSION = 1
 const APPLIED_KEY = 'gym_watch_applied'
 const APPLIED_MAX = 300
 const SEND_DEBOUNCE_MS = 400
-// Routines the watch can start besides today's: enough to choose from, small enough to send.
-const READY_MAX = 8
+// Routines the watch can start besides today's: every one a lifter keeps in practice, so the phone
+// can stay at home. fitSnapshot trims them (their "last time" lines first) when the snapshot would
+// not fit the application context.
+export const READY_MAX = 30
 
 const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 // A body weight from the watch that holds up (kg or lb, whatever the profile uses).
@@ -370,7 +372,8 @@ const bytesOf = v => new TextEncoder().encode(typeof v === 'string' ? v : JSON.s
 
 /**
  * The snapshot made small enough to send, dropping first what matters least: the "last time" lines
- * of the routines the watch could start, then those routines but today's, then today's own "last
+ * of the routines the watch could start, then those routines but today's (down to a dozen, three,
+ * none), then today's own "last
  * time" lines and records, then the "last time" of the running workout, then what is ready
  * altogether. The running workout's sets are never cut: without them the watch has nothing to do.
  */
@@ -380,6 +383,7 @@ export function fitSnapshot (snap, max = SNAPSHOT_MAX_BYTES) {
   const strip = (entries, ...keys) => { for (const e of entries || []) for (const k of keys) delete e[k] }
   const steps = [
     () => { for (const r of out.ready?.others || []) strip(r.entries, 'last', 'best') },
+    () => { if (out.ready) out.ready.others = (out.ready.others || []).slice(0, 12) },
     () => { if (out.ready) out.ready.others = (out.ready.others || []).slice(0, 3) },
     () => { if (out.ready) out.ready.others = [] },
     () => { if (out.ready?.today) strip(out.ready.today.entries, 'last', 'best') },
