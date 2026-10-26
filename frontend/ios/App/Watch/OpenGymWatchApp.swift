@@ -314,6 +314,8 @@ struct ExercisePage: View {
     @State private var confirmSkip = false
     /// The exercise's ⋯: sets added or removed, the exercise swapped, another one added.
     @State private var actions = false
+    /// The exercise's animation, large.
+    @State private var howTo = false
     @Environment(\.dynamicTypeSize) private var typeSize
     @ScaledMetric(relativeTo: .title) private var doneSizeScaled: CGFloat = 58
     /// Large enough to hit, small enough to leave room for the numbers at the largest text sizes.
@@ -374,12 +376,14 @@ struct ExercisePage: View {
                 if current, SessionStore.demoScreen == "edit-weight" { editing = .weight }
                 if current, SessionStore.demoScreen == "edit-reps" { editing = .reps }
                 if current, SessionStore.demoScreen == "actions" { actions = true }
+                if current, SessionStore.demoScreen == "howto" || SessionStore.demoScreen == "howto-none" { howTo = true }
                 if current, SessionStore.demoScreen == "edit-speed" { editing = .speed }
             }
             .sheet(item: $editing) { field in
                 ValueEditor(field: field, entry: entry, unit: w.unit)
             }
             .sheet(isPresented: $actions) { ExerciseActions(index: index) { actions = false } }
+            .sheet(isPresented: $howTo) { NavigationStack { HowToView(entry: entry) } }
             .confirmationDialog(Text("Skip this set?"), isPresented: $confirmSkip) {
                 Button("Skip set") { store.skipSet() }
                 Button("Cancel", role: .cancel) {}
@@ -435,19 +439,26 @@ struct ExercisePage: View {
 
     @ViewBuilder private func header(_ entry: Entry) -> some View {
         HStack(alignment: .top, spacing: 6) {
-            if store.show.showClip, let clip = store.clips[entry.id] {
-                ClipView(clip: clip, animating: index == store.entryIndex).frame(width: 30, height: 30)
+            // The animation and the name open How to do it: the animation large (kept on the watch).
+            HStack(alignment: .top, spacing: 6) {
+                if store.show.showClip, let clip = store.clip(for: entry.id) {
+                    ClipView(clip: clip, animating: index == store.entryIndex).frame(width: 30, height: 30)
+                }
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(entry.name)
+                        .font(.system(.footnote, design: .rounded).weight(.semibold))
+                        // One line at the large sizes (shrunk to fit): two would push the page up into the clock.
+                        .lineLimit(typeSize.isAccessibilitySize ? 1 : 2)
+                        .minimumScaleFactor(typeSize.isAccessibilitySize ? 0.6 : 0.8)
+                        .fixedSize(horizontal: false, vertical: true)
+                    WorkoutExtras()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            VStack(alignment: .leading, spacing: 0) {
-                Text(entry.name)
-                    .font(.system(.footnote, design: .rounded).weight(.semibold))
-                    // One line at the large sizes (shrunk to fit): two would push the page up into the clock.
-                    .lineLimit(typeSize.isAccessibilitySize ? 1 : 2)
-                    .minimumScaleFactor(typeSize.isAccessibilitySize ? 0.6 : 0.8)
-                    .fixedSize(horizontal: false, vertical: true)
-                WorkoutExtras()
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture { howTo = true }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint(Text("How to do it"))
             OfflineSign()
             if store.show.showHr { HeartRateBadge(health: store.health) }
             Button { actions = true } label: {
@@ -526,6 +537,7 @@ struct ExerciseActions: View {
                     if let si = si, entry.sets.count > 1 {
                         row("minus.circle", Text("Remove set")) { store.removeSet(si, in: index) }
                     }
+                    NavigationLink { HowToView(entry: entry) } label: { label("play.rectangle", Text("How to do it")) }
                     NavigationLink {
                         ExercisePicker(title: Text("Swap exercise"), exclude: entry.id) { store.swapExercise(index, to: $0); close() }
                     } label: { label("arrow.triangle.2.circlepath", Text("Swap exercise")) }
@@ -603,6 +615,43 @@ struct ExercisePicker: View {
         let reps = "\(n) × \(formatNumber(first.r ?? 0))"
         let w = first.w ?? 0
         return w > 0 ? "\(reps) · \(e.isBodyweight ? "+" : "")\(formatNumber(w)) \(unit)" : reps
+    }
+}
+
+/*
+ * How to do it: the exercise's animation as large as the screen allows, the one the phone shows,
+ * kept on the watch ahead of time so it is there with the phone at home. An exercise it has none
+ * for (one added at the wrist the phone never sent, or one without an animation) gets a figure.
+ */
+struct HowToView: View {
+    @EnvironmentObject var store: SessionStore
+    let entry: Entry
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 6) {
+                if let clip = store.clip(for: entry.id) {
+                    ClipView(clip: clip, animating: true)
+                        .aspectRatio(1, contentMode: .fit)
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Image(systemName: entry.isCardio ? "figure.run" : "figure.strengthtraining.traditional")
+                        .font(.system(size: 54, weight: .regular))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, minHeight: 110)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.dim))
+                        .accessibilityHidden(true)
+                }
+                Text(verbatim: entry.name)
+                    .font(.system(.footnote, design: .rounded).weight(.semibold))
+                    .multilineTextAlignment(.center)
+                if let last = entry.last, !last.isEmpty {
+                    Text("Last time: \(last)").font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                }
+            }
+            .padding(.horizontal, 4)
+        }
+        .navigationTitle(Text("How to do it"))
     }
 }
 

@@ -749,9 +749,61 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         DispatchQueue.main.async { self.clipLog = Array((self.clipLog + ["\(stamp) \(line)"]).suffix(30)) }
     }
 
-    /// The workout is over: its animations go, from memory and from the disk.
+    /* ---------- the animations kept for good (the phone at home) ---------- */
+
+    /// The library: one GIF per exercise of the phone's routines, kept on disk between workouts.
+    private static var libraryDir: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("clip-library")
+    }
+    private static let libraryKey = "clipLibrary"
+    /// What the library holds: exercise → the source it was made from (the phone's key).
+    private(set) var libraryIndex: [String: String] {
+        get { (UserDefaults.standard.dictionary(forKey: SessionStore.libraryKey) as? [String: String]) ?? [:] }
+        set { UserDefaults.standard.set(newValue, forKey: SessionStore.libraryKey) }
+    }
+    /// Decoded library animations, only for what was shown (a few at a time).
+    private var libraryFrames: [String: ClipFrames] = [:]
+    private var statusSoon: DispatchWorkItem?
+
+    private static func libraryFile(_ exId: String) -> URL {
+        libraryDir.appendingPathComponent(exId.replacingOccurrences(of: "/", with: "_") + ".gif")
+    }
+
+    /// An exercise's animation: the running workout's, else the library's (decoded once, when first
+    /// shown), else nil (the view shows a placeholder).
+    func clip(for exId: String) -> ClipFrames? {
+        if let c = clips[exId] { return c }
+        if let c = libraryFrames[exId] { return c }
+        guard libraryIndex[exId] != nil, let frames = SessionStore.frames(of: SessionStore.libraryFile(exId)) else { return nil }
+        if libraryFrames.count >= 12 { libraryFrames.removeAll() }
+        libraryFrames[exId] = frames
+        return frames
+    }
+
+    /// A library file arrived: kept under its exercise, and the phone told what the watch now has.
+    private func keepInLibrary(_ file: WCSessionFile, exId: String) {
+        let key = file.metadata?["key"] as? String ?? ""
+        let dest = SessionStore.libraryFile(exId)
+        try? FileManager.default.createDirectory(at: SessionStore.libraryDir, withIntermediateDirectories: true)
+        try? FileManager.default.removeItem(at: dest)
+        guard (try? FileManager.default.moveItem(at: file.fileURL, to: dest)) != nil else { log("\(exId): could not keep the library file"); return }
+        log("\(exId): kept in the library")
+        DispatchQueue.main.async {
+            self.libraryIndex[exId] = key
+            self.libraryFrames[exId] = nil
+            self.objectWillChange.send()
+            // Said once a batch has arrived, not after every file.
+            self.statusSoon?.cancel()
+            let work = DispatchWorkItem { [weak self] in self?.sendStatus() }
+            self.statusSoon = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: work)
+        }
+    }
+
+    /// The workout is over: its animations go, from memory and from the disk (the library stays).
     func dropClips() {
         clips = [:]
+        libraryFrames = [:]
         try? FileManager.default.removeItem(at: SessionStore.clipDir)
         log("clips deleted")
     }
@@ -764,6 +816,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     func session(_ session: WCSession, didReceive file: WCSessionFile) {
         // The file is gone once this returns: moved into the cache now.
         guard let exId = file.metadata?["exId"] as? String else { log("file without an exercise"); return }
+        if file.metadata?["wid"] as? String == "library" { keepInLibrary(file, exId: exId); return }
         let dir = SessionStore.clipDir
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let dest = dir.appendingPathComponent(exId.replacingOccurrences(of: "/", with: "_") + ".gif")
@@ -797,7 +850,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     func sendStatus() {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
         send(event: ["id": UUID().uuidString, "type": "watchStatus", "health": health.status, "version": version,
-                     "at": Date().timeIntervalSince1970 * 1000])
+                     "clips": libraryIndex, "at": Date().timeIntervalSince1970 * 1000])
     }
 
     func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
@@ -831,7 +884,8 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         if screen != "empty" { apply(json: json) }
         DispatchQueue.main.async {
             switch screen {
-            case "set", "weight", "rest", "offline", "edit-weight", "edit-reps", "actions": self.picked[0] = 2
+            case "set", "weight", "rest", "offline", "edit-weight", "edit-reps", "actions", "howto": self.picked[0] = 2
+            case "howto-none": self.state.entryIndex = 1
             case "add-set":
                 self.picked[0] = 2
                 self.addSet(in: 0)

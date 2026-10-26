@@ -27,6 +27,7 @@ import { sessionHistory } from './backfill.js'
 import { buildCombinedEntries, deriveSessionName } from './session-merge.js'
 import { todayISO } from './format.js'
 import { sanitizeHr } from './heart-rate.js'
+import { mediaOf, MEDIA_MIMES } from './media-refs.js'
 import { speedUnitOf } from './speed.js'
 import { readWatchPrefs, settingsForWatch, writeWatchStatus, onWatchPrefs } from './watch-settings.js'
 
@@ -226,26 +227,84 @@ export function buildSnapshot(S, { timer = null, ready = null } = {}) {
  * Nothing is ever fetched from anywhere.
  */
 export const WATCH_PACK_PX = 240
+
+// A custom exercise's own photo or video, as a file in the phone's media folder the native side
+// may read (lib/media-store-fs.js names them <hash>.<playExt>); WebM is not something it decodes.
+const MEDIA_FILE_RE = /^[0-9a-f]{64}\.(jpg|png|webp|gif|mp4)$/
+
+/**
+ * Where the watch's animation of one exercise comes from, as the phone itself shows it, or null:
+ * the downloaded pack of the figure, the built-in clip in the app package, or (a custom exercise)
+ * its own photo or video in the phone's media folder. `key` names the source, so the watch's
+ * copy is sent again only when it changes (another figure, a pack downloaded, a new photo).
+ */
+export function clipFor (S, exId, { packs = {}, figure = figureOf(S) } = {}) {
+  const custom = (S?.customEx || []).find(x => x && x.id === exId)
+  const m = custom ? mediaOf(custom) : null
+  if (m) {
+    const file = m.hash + '.' + (MEDIA_MIMES[m.mime]?.playExt || '')
+    return MEDIA_FILE_RE.test(file) ? { exId, media: file, key: 'm:' + m.hash } : null
+  }
+  const ex = EXIDX[exId]
+  if (!ex || !ex.gif) return null
+  const pid = packId(WATCH_PACK_PX, figure)
+  const pack = packs[pid] && packs[pid].state === 'ready' ? pid : null
+  const drawing = packDrawingId(ex, figure)
+  // a pack's files are read through Background Assets on the phone, never by a path
+  if (pack && drawing && /^[A-Za-z0-9_-]+$/.test(drawing)) return { exId, packId: pack, drawing, key: 'p:' + pack + ':' + drawing }
+  const path = gifSrc(ex, figure)
+  if (!/\.(webp|mp4|gif)$/i.test(path) || /^[a-z]+:|^\//i.test(path) || path.includes('..')) return null
+  return { exId, path, key: 'f:' + path }
+}
+
 export function clipsFor (S, packs = animPacks().packs || {}) {
   const A = S && S.active
   if (!A || !Array.isArray(A.entries)) return []
   const figure = figureOf(S)
-  const pid = packId(WATCH_PACK_PX, figure)
-  const pack = packs[pid] && packs[pid].state === 'ready' ? pid : null
   const out = [], seen = new Set()
   for (const e of A.entries) {
-    const ex = e && EXIDX[e.id]
-    if (!ex || seen.has(e.id) || !ex.gif) continue
+    if (!e || seen.has(e.id)) continue
     seen.add(e.id)
-    const drawing = packDrawingId(ex, figure)
-    // a pack's files are read through Background Assets on the phone, never by a path
-    if (pack && drawing && /^[A-Za-z0-9_-]+$/.test(drawing)) { out.push({ exId: e.id, packId: pack, drawing }); continue }
-    const path = gifSrc(ex, figure)
-    if (!/\.(webp|mp4|gif)$/i.test(path) || /^[a-z]+:|^\//i.test(path) || path.includes('..')) continue
-    out.push({ exId: e.id, path })
+    const c = clipFor(S, e.id, { packs, figure })
+    if (c) { const { key: _k, ...clip } = c; out.push(clip) }
   }
   return out
 }
+
+/*
+ * The animations the watch keeps for good, so a workout with the phone at home still shows them:
+ * one for every exercise of the ready routines and of the exercise list (buildExercises), made
+ * small (160 px GIFs) by the native side and sent once each. The watch says which it has (its
+ * status event's `clips`, exercise → key), and only the missing or changed ones go.
+ */
+export const CLIP_LIBRARY_MAX = 150
+export function libraryClipsFor (S, ready, exercises, packs = animPacks().packs || {}) {
+  const ids = [...(ready?.today?.entries || []), ...(ready?.others || []).flatMap(r => r.entries || []), ...(exercises?.extra || [])].map(e => e && e.id)
+  const figure = figureOf(S)
+  const out = []
+  for (const id of [...new Set(ids)]) {
+    if (typeof id !== 'string') continue
+    const c = clipFor(S, id, { packs, figure })
+    if (c) out.push(c)
+    if (out.length >= CLIP_LIBRARY_MAX) break
+  }
+  return out
+}
+
+/** Of the library, what the watch does not have yet (or has from another source). */
+export const clipsMissing = (library, have) => library.filter(c => !have || have[c.exId] !== c.key)
+
+const CLIP_LIB_KEY = 'gym_watch_clip_lib'
+/** What the watch said it keeps (exercise → key), sanitized. */
+export function readWatchClips () { try { return JSON.parse(localStorage.getItem(CLIP_LIB_KEY)) || {} } catch { return {} } }
+function writeWatchClips (v) {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return
+  const out = {}
+  for (const [k, key] of Object.entries(v).slice(0, 500)) if (typeof k === 'string' && typeof key === 'string' && k.length < 100 && key.length < 200) out[k] = key
+  try { localStorage.setItem(CLIP_LIB_KEY, JSON.stringify(out)) } catch { /* asked again next status */ }
+  afterClips?.()
+}
+let afterClips = null
 
 /* ---------- applying the watch's events ---------- */
 
@@ -408,6 +467,8 @@ export function applyEvents (events, getState) {
     } else if (ev.type === 'watchStatus') {
       // What the watch says about itself, for Settings → Apple Watch. Never queued behind anything.
       writeWatchStatus(ev)
+      // and the animations it keeps, so only what it lacks is sent
+      if (ev.clips) writeWatchClips(ev.clips)
     } else if (ev.type === 'setHr') {
       // The rest's heart rate comes once the rest is over, maybe after the workout was saved:
       // a field on that set, wherever the set is now. Nothing for a reading that does not hold up.
@@ -594,7 +655,7 @@ export async function startWatchSync ({ useStore, useUI }) {
   const p = await watchPlugin()
   if (!p) return () => {}
   getStateRef = () => useStore.getState()
-  let lastSent = null, lastClips = null, tm = null
+  let lastSent = null, lastClips = null, lastLibrary = null, tm = null
   // The ready sessions only change with the plan, the log or the day: built again only then.
   let readyKey = null, ready = null, exercises = null
   const readyFor = S => {
@@ -644,6 +705,15 @@ export async function startWatchSync ({ useStore, useUI }) {
         const r = await p.WatchBridge.sendSnapshot({ json })
         if (r && r.sent) lastSent = json
       }
+      // The animations the watch keeps for good (the phone at home): what it lacks, once a change.
+      if (prefs.enabled && (prefs.show?.clip ?? true)) {
+        const missing = clipsMissing(libraryClipsFor(S, ready, exercises), readWatchClips())
+        const libKey = missing.map(c => c.exId + '=' + c.key).join(',')
+        if (missing.length && libKey !== lastLibrary) {
+          await p.WatchBridge.sendClips({ wid: 'library', clips: missing })
+          lastLibrary = libKey
+        }
+      }
       // The workout's animations, once per workout and exercise (the native side remembers).
       const clips = prefs.enabled ? clipsFor(S) : []
       const key = S.active ? S.active.id + '|' + clips.map(c => c.exId).join(',') : ''
@@ -658,6 +728,8 @@ export async function startWatchSync ({ useStore, useUI }) {
     } catch { /* no watch, or not now: the next change tries again */ }
   }
   const schedule = () => { if (!linked) return; clearTimeout(tm); tm = setTimeout(send, SEND_DEBOUNCE_MS) }
+  // The watch said which animations it keeps: what it lacks goes now.
+  afterClips = () => { lastLibrary = null; schedule() }
   const offStore = useStore.subscribe((s, prev) => {
     // Boot done: what the watch sent meanwhile is applied now, and the watch hears the real state.
     if (s.ready && !prev.ready) { drainWatchEvents(); schedule() }
@@ -687,7 +759,7 @@ export async function startWatchSync ({ useStore, useUI }) {
 
 // Test seams.
 export function _setWatchPluginForTest (plugin, getState) { pluginP = Promise.resolve(plugin ? { WatchBridge: plugin } : null); getStateRef = getState || null }
-export function _resetWatchSync () { startedOnWatch.clear(); handlers = null; appHandlers = null; pluginP = null; getStateRef = null; draining = null }
+export function _resetWatchSync () { startedOnWatch.clear(); handlers = null; appHandlers = null; pluginP = null; getStateRef = null; draining = null; afterClips = null }
 
 /**
  * Writes `fields` (heart rate) onto one set: in the running session when it is that workout, else in

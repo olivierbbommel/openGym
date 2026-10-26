@@ -3,7 +3,7 @@
 // changed at the wrist, a workout started empty. The snapshot carries what that needs and still
 // fits; the watch's changes come back as events the workout screen applies with its own actions.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { buildReady, buildSnapshot, buildExercises, fitSnapshot, READY_MAX, SNAPSHOT_MAX_BYTES, EXTRA_MAX, _resetWatchSync, applyEvents, bindWatchActions, bindWatchAppActions, alignToWatchRows, recentlyApplied } from './watch-sync.js'
+import { clipFor, libraryClipsFor, clipsMissing, readWatchClips, CLIP_LIBRARY_MAX, buildReady, buildSnapshot, buildExercises, fitSnapshot, READY_MAX, SNAPSHOT_MAX_BYTES, EXTRA_MAX, _resetWatchSync, applyEvents, bindWatchActions, bindWatchAppActions, alignToWatchRows, recentlyApplied } from './watch-sync.js'
 import { swapActiveExercise } from './active-exercise-swap.js'
 import { buildCompletedWorkout } from './finish-workout.js'
 import { bestWeightForEntry } from './history.js'
@@ -238,3 +238,42 @@ describe('a workout thrown away at the wrist', () => {
     expect(applyEvents([{ id: 'd2', type: 'discard', wid: 'w-1', at: 1 }], () => ({ S }))).toEqual([])
   })
 })
+
+describe('the animations kept on the watch for good', () => {
+  const withGif = EXDB.filter(e => e.gif && e.bp !== 'cardio').slice(0, 3).map(e => e.id)
+  const S = {
+    unit: 'kg', workouts: [], week: {}, dayPlan: {},
+    routines: [{ id: 'r1', name: 'A', ex: withGif.map(id => ({ id, sets: 2, reps: 8 })) }],
+    customEx: [{ id: 'c1', n: 'My cable thing', bp: 'chest', media: { kind: 'image', hash: 'a'.repeat(64), mime: 'image/jpeg', size: 1000, width: 400, height: 400 } }],
+  }
+
+  it('one per exercise of the routines and the list, each named by its source', () => {
+    const ready = buildReady(S, '2026-10-26')
+    const lib = libraryClipsFor(S, ready, { extra: [{ id: 'c1' }, { id: withGif[0] }] }, {})
+    expect(lib.map(c => c.exId)).toEqual([...withGif, 'c1'])
+    expect(lib[0]).toMatchObject({ path: expect.stringMatching(/^exercise-media\/clip\//), key: expect.stringMatching(/^f:/) })
+    // a custom exercise's own photo, a file of the phone's media folder by its hash
+    expect(lib[3]).toEqual({ exId: 'c1', media: 'a'.repeat(64) + '.jpg', key: 'm:' + 'a'.repeat(64) })
+    expect(CLIP_LIBRARY_MAX).toBeGreaterThanOrEqual(100)
+  })
+
+  it('a pack downloaded since changes the source, so the watch gets the sharper one', () => {
+    const packs = { 'anim-240-male': { state: 'ready' } }
+    const before = clipFor(S, withGif[0], { packs: {}, figure: 'male' })
+    const after = clipFor(S, withGif[0], { packs, figure: 'male' })
+    expect(after.key).not.toBe(before.key)
+    expect(clipsMissing([after], { [withGif[0]]: before.key })).toHaveLength(1)
+    expect(clipsMissing([after], { [withGif[0]]: after.key })).toHaveLength(0)
+  })
+
+  it('a custom video in a format the watch cannot be made from (WebM) is left out', () => {
+    const webm = { ...S, customEx: [{ id: 'c2', media: { kind: 'video', hash: 'b'.repeat(64), mime: 'video/webm', size: 5, width: 10, height: 10 } }] }
+    expect(clipFor(webm, 'c2')).toBeNull()
+  })
+
+  it('the watch says what it keeps in its status, and only what it lacks is sent', () => {
+    applyEvents([{ id: 'st1', type: 'watchStatus', health: 'on', version: '1.4.2', clips: { [withGif[0]]: 'f:x', bad: 5 }, at: 1 }], () => ({ S }))
+    expect(readWatchClips()).toEqual({ [withGif[0]]: 'f:x' })
+  })
+})
+

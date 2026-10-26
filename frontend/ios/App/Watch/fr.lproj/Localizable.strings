@@ -40,6 +40,7 @@
 "Discard workout" = "Abandonner la séance";
 "Discard workout?" = "Abandonner la séance ?";
 "Discard" = "Abandonner";
+"How to do it" = "Comment le faire";
 "The sets you logged in this session will be lost." = "Les séries notées dans cette session seront perdues.";
 "Last time: %@" = "La dernière fois: %@";
 "Recent" = "Récents";

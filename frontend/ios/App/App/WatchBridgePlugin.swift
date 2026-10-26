@@ -33,8 +33,9 @@ import WatchConnectivity
  *   await WatchBridge.dropClips()         // the workout is over: clips still on their way are cancelled
  *   WatchBridge.addListener('watchState', ...)   // activated, paired, installed changed: ask status again
  *
- * Animations: only the running workout's, only as files sent with transferFile (the watch keeps
- * them while that workout runs and deletes them after). Each is what this phone shows for that
+ * Animations: the running workout's, as files sent with transferFile (the watch keeps them while
+ * that workout runs and deletes them after); and, with `wid: "library"`, those of every routine's
+ * exercises, which the watch keeps for good so a workout with the phone at home shows them too. Each is what this phone shows for that
  * exercise: a file of a downloaded animation pack (`file`), or the app's built-in clip in the app
  * package (`path` under public/: the store build's animated WebP, an MP4 loop in other builds).
  * Made into a small looping GIF here (ImageIO reads animated WebP; AVFoundation the MP4), because
@@ -147,9 +148,10 @@ public class WatchBridgePlugin: CAPPlugin, CAPBridgedPlugin, WCSessionDelegate {
     /// pile up in the queue while the watch is away, and the watch drops them on arrival anyway).
     @objc func dropClips(_ call: CAPPluginCall) {
         if WCSession.isSupported(), WCSession.default.activationState == .activated {
-            WCSession.default.outstandingFileTransfers.forEach { $0.cancel() }
+            // The library's (kept for good on the watch) still go.
+            WCSession.default.outstandingFileTransfers.filter { ($0.file.metadata?["wid"] as? String) != WatchBridgePlugin.library }.forEach { $0.cancel() }
         }
-        clipQueue.async { self.clipsSent = [:] }
+        clipQueue.async { self.clipsSent = self.clipsSent.filter { $0.key == WatchBridgePlugin.library } }
         call.resolve()
     }
 
@@ -162,8 +164,10 @@ public class WatchBridgePlugin: CAPPlugin, CAPBridgedPlugin, WCSessionDelegate {
         for (url, _) in dated.sorted(by: { $0.1 > $1.1 }).dropFirst(keep) { try? FileManager.default.removeItem(at: url) }
     }
 
-    /// The clips already on their way for each workout, by exercise.
+    /// The clips already on their way for each workout, by exercise (the library's by exercise and source).
     private var clipsSent: [String: Set<String>] = [:]
+    /// The `wid` of the animations the watch keeps for good.
+    static let library = "library"
     private let clipQueue = DispatchQueue(label: "ch.opengym.watch-clips", qos: .utility)
 
     @objc func sendClips(_ call: CAPPluginCall) {
@@ -173,27 +177,43 @@ public class WatchBridgePlugin: CAPPlugin, CAPBridgedPlugin, WCSessionDelegate {
         let clips = (call.getArray("clips") ?? []).compactMap { $0 as? [String: Any] }
         call.resolve(["queued": clips.count])
         // Another workout's clips still queued (the watch was away): cancelled, this one's go first.
-        for t in s.outstandingFileTransfers where (t.file.metadata?["wid"] as? String) != wid { t.cancel() }
+        // The library's are never cancelled for a workout's, nor a workout's for the library's.
+        if wid != WatchBridgePlugin.library {
+            for t in s.outstandingFileTransfers {
+                let w = t.file.metadata?["wid"] as? String
+                if w != wid && w != WatchBridgePlugin.library { t.cancel() }
+            }
+        }
         clipQueue.async {
             var sent = self.clipsSent[wid] ?? []
-            if self.clipsSent.count > 4 { self.clipsSent = self.clipsSent.filter { $0.key == wid } }
-            defer { WatchBridgePlugin.pruneClipCache() }
+            if self.clipsSent.count > 4 { self.clipsSent = self.clipsSent.filter { $0.key == wid || $0.key == WatchBridgePlugin.library } }
+            defer { WatchBridgePlugin.pruneClipCache(keep: 200) }
             for clip in clips {
-                guard let exId = clip["exId"] as? String, !sent.contains(exId),
-                      let gif = WatchBridgePlugin.gifFor(clip, named: exId) else { continue }
-                s.transferFile(gif, metadata: ["exId": exId, "wid": wid])
-                sent.insert(exId)
+                guard let exId = clip["exId"] as? String else { continue }
+                let key = clip["key"] as? String ?? ""
+                let mark = wid == WatchBridgePlugin.library ? "\(exId)|\(key)" : exId
+                guard !sent.contains(mark), let gif = WatchBridgePlugin.gifFor(clip, named: exId) else { continue }
+                s.transferFile(gif, metadata: ["exId": exId, "wid": wid, "key": key])
+                sent.insert(mark)
             }
             self.clipsSent[wid] = sent
         }
     }
 
     /// The clip as a small GIF: a file of a downloaded animation pack (`packId` + `drawing`, read
-    /// through Background Assets, never by path) or a file in the app package (`path` under
-    /// public/). Anything else is refused.
+    /// through Background Assets, never by path), a file in the app package (`path` under
+    /// public/), or a custom exercise's own photo or video (`media`: "<sha256>.<ext>" in the
+    /// app's media folder, lib/media-store-fs.js). Anything else is refused.
     static func gifFor(_ clip: [String: Any], named exId: String) -> URL? {
         let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("watch-clips")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        if let media = clip["media"] as? String {
+            guard media.range(of: "^[0-9a-f]{64}\\.(jpg|png|webp|gif|mp4)$", options: .regularExpression) != nil else { return nil }
+            let source = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("opengym-media").appendingPathComponent(media)
+            guard FileManager.default.isReadableFile(atPath: source.path) else { return nil }
+            return gif(for: source, named: "media-" + String(media.prefix(64)))
+        }
         if let pack = clip["packId"] as? String, let drawing = clip["drawing"] as? String {
             let out = dir.appendingPathComponent("\(pack)-\(drawing).gif")
             if FileManager.default.fileExists(atPath: out.path) { touch(out); return out }
