@@ -487,6 +487,31 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         Haptics.start()
     }
 
+    /* ---------- the session's shape, changed here ---------- */
+
+    /// One more set on exercise `ei` (a copy of its last), for the phone too.
+    func addSet(in ei: Int) {
+        ackRestOver()
+        let (next, event) = SessionCore.addSet(state, entry: ei, at: Date().timeIntervalSince1970 * 1000, id: UUID().uuidString)
+        guard let ev = event else { return }
+        send(event: ev)
+        state = next
+        if ei == entryIndex { loadTargets() }
+        WKInterfaceDevice.current().play(.click)
+    }
+
+    /// Set `si` of exercise `ei` taken out (only one not done), for the phone too.
+    func removeSet(_ si: Int, in ei: Int) {
+        ackRestOver()
+        let (next, event) = SessionCore.removeSet(state, entry: ei, set: si, at: Date().timeIntervalSince1970 * 1000, id: UUID().uuidString)
+        guard let ev = event else { return }
+        send(event: ev)
+        state = next
+        picked[ei] = nil
+        if ei == entryIndex { loadTargets() }
+        WKInterfaceDevice.current().play(.click)
+    }
+
     /// Finishes the session: the phone saves it with its own Finish and save.
     func finish() {
         closeRest(at: Date())

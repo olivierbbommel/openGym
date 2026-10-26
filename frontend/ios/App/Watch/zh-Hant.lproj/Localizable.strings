@@ -28,6 +28,8 @@
 "Body weight" = "體重";
 "Less" = "較少";
 "More" = "較多";
+"Add set" = "新增一組";
+"Remove set" = "刪除一組";
 "Last time: %@" = "上次: %@";
 "No workout running" = "沒有進行中的訓練";
 "Start one on your iPhone and it shows up here." = "在 iPhone 上開始，它就會出現在這裡。";

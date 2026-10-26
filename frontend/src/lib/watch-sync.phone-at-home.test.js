@@ -2,8 +2,8 @@
 // The Apple Watch with the phone left at home: every routine to start from, sets and exercises
 // changed at the wrist, a workout started empty. The snapshot carries what that needs and still
 // fits; the watch's changes come back as events the workout screen applies with its own actions.
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { buildReady, buildSnapshot, fitSnapshot, READY_MAX, SNAPSHOT_MAX_BYTES, _resetWatchSync } from './watch-sync.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { buildReady, buildSnapshot, fitSnapshot, READY_MAX, SNAPSHOT_MAX_BYTES, _resetWatchSync, applyEvents, bindWatchActions, alignToWatchRows, recentlyApplied } from './watch-sync.js'
 import { EXDB } from './exercises-data.js'
 
 const bytes = v => new TextEncoder().encode(JSON.stringify(v)).length
@@ -49,5 +49,48 @@ describe('every routine on the watch', () => {
     expect(bytes(small)).toBeLessThanOrEqual(30 * 1024)
     expect(small.ready.others.every(r => r.entries.every(e => e.last === undefined))).toBe(true)
     expect(small.ready.others.length).toBeGreaterThanOrEqual(12)
+  })
+})
+
+describe('a set added or removed at the wrist', () => {
+  const active = () => ({
+    id: 'w-1', cur: 0,
+    entries: [{ id: '0025', target: { sets: 2, reps: 8 }, sets: [{ w: 60, r: 8, done: true, at: 5 }, { w: 60, r: 8, done: false }] }],
+  })
+
+  it('goes through the workout screen\'s own Add set and remove, with the watch\'s rows', () => {
+    const S = { active: active() }
+    const addSet = vi.fn(), removeSet = vi.fn()
+    bindWatchActions({ addSet, removeSet })
+    const rows3 = [{ w: 60, r: 8 }, { w: 62.5, r: 8 }, { w: 62.5, r: 8 }]
+    const done = applyEvents([
+      { id: 'a1', type: 'addSet', wid: 'w-1', exId: '0025', entryIdx: 0, rows: rows3, at: 1 },
+      { id: 'r1', type: 'removeSet', wid: 'w-1', exId: '0025', entryIdx: 0, setIdx: 2, rows: rows3.slice(0, 2), at: 2 },
+      // another workout's change is done with, applied to nothing
+      { id: 'x1', type: 'addSet', wid: 'w-old', exId: '0025', entryIdx: 0, rows: rows3, at: 3 },
+    ], () => ({ S }))
+    expect(done).toEqual(['a1', 'r1', 'x1'])
+    expect(addSet).toHaveBeenCalledWith(0, [{ w: 60, r: 8, sec: null, warmup: false }, { w: 62.5, r: 8, sec: null, warmup: false }, { w: 62.5, r: 8, sec: null, warmup: false }])
+    expect(removeSet).toHaveBeenCalledWith(0, 2, expect.any(Array))
+    expect(addSet).toHaveBeenCalledTimes(1)
+    // the snapshot names them, so the watch stops laying its own copy over the phone's
+    expect(recentlyApplied()).toEqual(['a1', 'r1', 'x1'])
+  })
+
+  it('waits for the workout screen like a tick does', () => {
+    const S = { active: active() }
+    expect(applyEvents([{ id: 'a2', type: 'addSet', wid: 'w-1', exId: '0025', entryIdx: 0, rows: [], at: 1 }], () => ({ S }))).toEqual([])
+  })
+
+  it('the rows even out with the watch\'s: same count, its numbers on the rows not done, done rows untouched', () => {
+    const sets = [{ w: 60, r: 8, done: true, at: 5 }, { w: 60, r: 8, done: false }]
+    expect(alignToWatchRows(sets, [{ w: 60, r: 8 }, { w: 65, r: 6 }, { w: 65, r: 6 }])).toEqual([
+      { w: 60, r: 8, done: true, at: 5 }, { w: 65, r: 6, done: false }, { w: 65, r: 6, done: false },
+    ])
+    // fewer rows: the last not-done ones go, never a done one
+    expect(alignToWatchRows([{ w: 1, r: 1, done: false }, { w: 2, r: 2, done: true }], [{ w: 9, r: 9 }])).toEqual([{ w: 2, r: 2, done: true }])
+    expect(alignToWatchRows([{ w: 2, r: 2, done: true }], [])).toEqual([{ w: 2, r: 2, done: true }])
+    // a copy of a ticked row comes back not done, without its tick time or heart rate
+    expect(alignToWatchRows([{ w: 50, r: 5, done: true, at: 9, hr: { avg: 120 } }], [{ w: 50, r: 5 }, { w: 50, r: 5 }])[1]).toEqual({ w: 50, r: 5, done: false })
   })
 })

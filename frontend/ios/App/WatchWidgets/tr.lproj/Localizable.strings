@@ -28,6 +28,8 @@
 "Body weight" = "Vücut ağırlığı";
 "Less" = "Az";
 "More" = "Çok";
+"Add set" = "Set ekle";
+"Remove set" = "Set kaldır";
 "Last time: %@" = "Geçen sefer: %@";
 "No workout running" = "Devam eden antrenman yok";
 "Start one on your iPhone and it shows up here." = "iPhone’unda bir tane başlat, burada görünür.";

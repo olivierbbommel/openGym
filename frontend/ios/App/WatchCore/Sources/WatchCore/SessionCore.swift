@@ -58,6 +58,24 @@ struct SessionState: Codable, Equatable {
     /// Sets passed over here ("exerciseId#setIndex"), not done: the next one comes up instead.
     /// Optional, like every field added later, so a state saved by an older build still loads.
     var skipped: [String]?
+    /// Changes made here to the session's shape (a set added or removed), by event id, until a
+    /// snapshot says the phone applied them: until then they are laid over each snapshot.
+    var edits: [WatchEdit]?
+}
+
+/// A change made here to the session's shape, as it is laid over a snapshot again.
+struct WatchEdit: Codable, Equatable {
+    /// The event's id, which the phone names in `applied` once it has it.
+    var id: String
+    /// "addSet" or "removeSet".
+    var kind: String
+    var exId: String
+    /// The exercise's place when the change was made (found by `exId` when it moved).
+    var entry: Int
+    /// removeSet: the set taken out.
+    var set: Int?
+    /// addSet: the rows added.
+    var rows: [SetRow]?
 }
 
 typealias Event = [String: Any]
@@ -95,7 +113,15 @@ enum SessionCore {
             // Another workout (or the first one this watch sees): its own position, no old ticks.
             s.pending = [:]
             s.skipped = nil
+            s.edits = nil
             s.entryIndex = next.cur
+        } else if let edits = s.edits, !edits.isEmpty {
+            // This watch's own changes to the session's shape the phone has not applied yet are laid
+            // over its snapshot again; a phone that names nothing applied knows no such changes.
+            let applied = Set(snap.applied ?? [])
+            let open = snap.applied == nil ? [] : edits.filter { !applied.contains($0.id) }
+            for e in open { next = applyEdit(next, e) }
+            s.edits = open.isEmpty ? nil : open
         }
         // The watch's ticks the phone has not shown yet win; the later tick wins on a set both changed.
         for (ei, e) in next.entries.enumerated() {
@@ -179,6 +205,100 @@ enum SessionCore {
         if let side = oneSide { event["side"] = side }
         if let hr = hr { event["hr"] = hr }
         return (s, event)
+    }
+
+    /* ---------- the session's shape, changed here (the phone at home) ---------- */
+
+    /// The exercise an edit means: at its old place while that still holds it, else found by id.
+    static func entryIndex(_ w: ActiveWorkout, _ ei: Int, _ exId: String) -> Int? {
+        if w.entries.indices.contains(ei), w.entries[ei].id == exId { return ei }
+        return w.entries.firstIndex { $0.id == exId }
+    }
+
+    /// One change made here, laid over a workout (a snapshot that does not have it yet).
+    static func applyEdit(_ w0: ActiveWorkout, _ e: WatchEdit) -> ActiveWorkout {
+        var w = w0
+        guard let ei = entryIndex(w, e.entry, e.exId) else { return w }
+        switch e.kind {
+        case "addSet":
+            w.entries[ei].sets.append(contentsOf: e.rows ?? [])
+        case "removeSet":
+            if let si = e.set, w.entries[ei].sets.indices.contains(si), !w.entries[ei].sets[si].done, w.entries[ei].sets.count > 1 {
+                w.entries[ei].sets.remove(at: si)
+            }
+        default:
+            break
+        }
+        return w
+    }
+
+    /// An exercise's rows as an event carries them, for the phone to even its own out with.
+    static func rowsPayload(_ sets: [SetRow]) -> [[String: Any]] {
+        sets.map { row in
+            var out: [String: Any] = ["warmup": row.warmup]
+            if let w = row.w { out["w"] = w }
+            if let r = row.r { out["r"] = r }
+            if let sec = row.sec { out["sec"] = sec }
+            return out
+        }
+    }
+
+    /// A row like `base`, not done: what Add set appends (the phone's addSet copies the last set too).
+    static func freshRow(like base: SetRow?) -> SetRow {
+        guard let b = base else { return SetRow(w: 0, r: 10, sec: nil, done: false, warmup: false) }
+        let sides = b.sides.map { Sides(L: SideRow(w: $0.L.w, r: $0.L.r, done: false), R: SideRow(w: $0.R.w, r: $0.R.r, done: false)) }
+        return SetRow(w: b.w, r: b.r, sec: b.sec, done: false, warmup: false, at: nil, sides: sides)
+    }
+
+    private static func remember(_ s: inout SessionState, _ e: WatchEdit) {
+        s.edits = Array(((s.edits ?? []) + [e]).suffix(100))
+    }
+
+    /// One more set on exercise `ei`, a copy of its last one (a hold done one side at a time gets
+    /// one for each side, as on the phone). Not for cardio, which is logged on the phone.
+    static func addSet(_ s0: SessionState, entry ei: Int, at: Double, id: String) -> (SessionState, Event?) {
+        guard var w = s0.workout, w.entries.indices.contains(ei), !w.entries[ei].isCardio else { return (s0, nil) }
+        var s = s0
+        let e = w.entries[ei]
+        let row = freshRow(like: e.sets.last(where: { !$0.warmup }) ?? e.sets.last)
+        let rows = e.isTimed && e.perSide == true ? [row, row] : [row]
+        w.entries[ei].sets.append(contentsOf: rows)
+        s.workout = w
+        remember(&s, WatchEdit(id: id, kind: "addSet", exId: e.id, entry: ei, set: nil, rows: rows))
+        return (s, ["id": id, "type": "addSet", "wid": w.id ?? "", "exId": e.id, "entryIdx": ei,
+                    "rows": rowsPayload(w.entries[ei].sets), "at": at])
+    }
+
+    /// Set `si` of exercise `ei` taken out: only one not done, and never the last one left. The
+    /// ticks and skips of the sets after it move up with them.
+    static func removeSet(_ s0: SessionState, entry ei: Int, set si: Int, at: Double, id: String) -> (SessionState, Event?) {
+        guard var w = s0.workout, w.entries.indices.contains(ei), w.entries[ei].sets.indices.contains(si),
+              !w.entries[ei].sets[si].done, w.entries[ei].sets.count > 1 else { return (s0, nil) }
+        var s = s0
+        let exId = w.entries[ei].id
+        w.entries[ei].sets.remove(at: si)
+        s.workout = w
+        s.pending = shifted(s.pending, exId: exId, after: si)
+        if let sk = s.skipped {
+            let moved = shifted(Dictionary(uniqueKeysWithValues: sk.map { ($0, true) }), exId: exId, after: si)
+            s.skipped = moved.keys.sorted()
+        }
+        remember(&s, WatchEdit(id: id, kind: "removeSet", exId: exId, entry: ei, set: si, rows: nil))
+        return (s, ["id": id, "type": "removeSet", "wid": w.id ?? "", "exId": exId, "entryIdx": ei, "setIdx": si,
+                    "rows": rowsPayload(w.entries[ei].sets), "at": at])
+    }
+
+    /// Keys "exId#i" (and "exId#i#side") of the sets after `si` moved up one; the one at `si` gone.
+    static func shifted<V>(_ d: [String: V], exId: String, after si: Int) -> [String: V] {
+        var out: [String: V] = [:]
+        for (k, v) in d {
+            let parts = k.split(separator: "#", omittingEmptySubsequences: false).map(String.init)
+            guard parts.count >= 2, parts[0] == exId, let i = Int(parts[1]) else { out[k] = v; continue }
+            if i == si { continue }
+            let side = parts.count > 2 ? parts[2] : nil
+            out[key(exId, i > si ? i - 1 : i, side)] = v
+        }
+        return out
     }
 
     /// A set passed over here: not done, the next one comes up (a tap on its dot brings it back).

@@ -194,6 +194,48 @@ let appHandlers = null   // the app's: start
 const readApplied = () => { try { return JSON.parse(localStorage.getItem(APPLIED_KEY)) || [] } catch { return [] } }
 const writeApplied = ids => { try { localStorage.setItem(APPLIED_KEY, JSON.stringify(ids.slice(-APPLIED_MAX))) } catch { /* the queue's ack is what counts */ } }
 
+// The rows an exercise has on the watch after a change made there ({ w, r, sec, warmup }).
+const ROWS_MAX = 50
+function rowsOf (v) {
+  if (!Array.isArray(v)) return null
+  return v.slice(0, ROWS_MAX).filter(x => x && typeof x === 'object').map(x => ({ w: num(x.w), r: num(x.r), sec: num(x.sec), warmup: x.warmup === true }))
+}
+
+/**
+ * An exercise's sets made to match the watch's after a change made there (a set added or removed,
+ * an exercise added or swapped): the same number of rows, so the ticks that follow by position
+ * land on the same sets, and the numbers the watch showed on the rows not done yet. The phone's
+ * own change runs first (its rest timer, its per-side rows, its Undo); this only evens out what
+ * the two still disagree on. Done rows are never touched or dropped.
+ */
+export function alignToWatchRows (sets, rows) {
+  if (!Array.isArray(sets) || !Array.isArray(rows) || !rows.length) return Array.isArray(sets) ? sets : []
+  const out = sets.slice()
+  while (out.length > rows.length) {
+    let i = out.length - 1
+    while (i >= 0 && out[i]?.done) i--
+    if (i < 0) break
+    out.splice(i, 1)
+  }
+  while (out.length < rows.length) {
+    const last = out[out.length - 1]
+    const { done: _d, at: _a, hr: _h, restHr: _rh, ...rest } = last || {}
+    const copy = isSideSet(last)
+      ? { ...rest, sides: { L: { ...last.sides.L, done: false }, R: { ...last.sides.R, done: false } }, done: false }
+      : { ...rest, done: false }
+    out.push(last ? copy : { w: 0, r: 0, done: false })
+  }
+  return out.map((s, i) => {
+    const row = rows[i]
+    if (!row || s?.done || isSideSet(s)) return s
+    const next = { ...s }
+    if (row.w != null) next.w = row.w
+    if (row.r != null) next.r = row.r
+    if (row.sec != null) next.sec = row.sec
+    return next
+  })
+}
+
 /** The entry an event means: by position when it still holds that exercise, else by the exercise. */
 function entryIndexOf (A, ev) {
   if (A.entries[ev.entryIdx] && A.entries[ev.entryIdx].id === ev.exId) return ev.entryIdx
@@ -210,6 +252,12 @@ function entryIndexOf (A, ev) {
  *   setDone { wid, exId, entryIdx, setIdx, w, r, at }   the workout screen's own tick
  *   finish  { wid, at }              the workout screen's own Finish and save
  *   setHr   { wid, exId, entryIdx, setIdx, hr?, restHr? }   heart rate on a set (lib/heart-rate.js)
+ *   addSet    { wid, exId, entryIdx, rows }            the workout screen's own Add set
+ *   removeSet { wid, exId, entryIdx, setIdx, rows }    its own remove, a set not done only
+ *
+ * `rows` are the exercise's sets as the watch has them after the change, which the phone's own
+ * change is evened out with (alignToWatchRows). The snapshot names the events applied lately
+ * (`applied`), so the watch keeps showing its own change until the phone's copy has it.
  *
  * A tick for a workout already saved (finished on the phone while the watch was away) is written
  * into that saved workout, stamped so the next sync keeps it. A tick while the workout screen is
@@ -251,6 +299,17 @@ export function applyEvents (events, getState) {
       const idx = entryIndexOf(A, ev)
       const set = idx >= 0 ? A.entries[idx].sets?.[ev.setIdx] : null
       if (set) handlers.setDone(idx, ev.setIdx, { w: num(ev.w), r: num(ev.r), at: num(ev.at), hr: sanitizeHr(ev.hr), ...extraOf(ev) })
+    } else if ((ev.type === 'addSet' || ev.type === 'removeSet') && ours) {
+      // A set added or removed at the wrist: the workout screen's own Add set / remove, then the
+      // rows evened out with the watch's (alignToWatchRows).
+      if (!handlers) {
+        if (appHandlers?.openWorkout) appHandlers.openWorkout()
+        break
+      }
+      const idx = entryIndexOf(A, ev)
+      const rows = rowsOf(ev.rows)
+      if (idx >= 0 && ev.type === 'addSet' && handlers.addSet) handlers.addSet(idx, rows)
+      if (idx >= 0 && ev.type === 'removeSet' && handlers.removeSet && Number.isInteger(ev.setIdx)) handlers.removeSet(idx, ev.setIdx, rows)
     } else if (ev.type === 'weighIn') {
       // The weigh-in the watch asks for before a workout it starts: a body weight entry on its
       // day, as the phone's own check-in makes one (today's replaces today's).
@@ -290,6 +349,11 @@ export function applyEvents (events, getState) {
   writeApplied(applied)
   return done
 }
+
+// How many of the latest applied event ids the snapshot names (the watch's changes in flight).
+export const APPLIED_IN_SNAPSHOT = 40
+/** The ids of the watch's events applied lately, newest last, for the snapshot. */
+export const recentlyApplied = (max = APPLIED_IN_SNAPSHOT) => readApplied().slice(-max)
 
 /** The app's own actions, for what needs no screen (starting a session, a set's heart rate). */
 export function bindWatchAppActions (h) {
@@ -474,6 +538,8 @@ export async function startWatchSync ({ useStore, useUI }) {
         ? buildSnapshot(S, { timer: useUI.getState().timer, ready: readyFor(S) })
         : { v: SNAPSHOT_VERSION, unit: S.unit === 'lb' ? 'lb' : 'kg', active: null, ready: null }
       snap.settings = { ...settingsForWatch(prefs, healthOn), ...watchExtras(S) }
+      // The watch's own changes the phone has applied: the watch stops laying them over the snapshot.
+      if (prefs.enabled) snap.applied = recentlyApplied()
       // With Apple Health on: the deleted workouts, so the watch removes the copies it saved.
       if (healthOn) { const gone = healthGoneFor(S); if (gone.length) snap.healthGone = gone }
       const json = JSON.stringify(fitSnapshot(snap))

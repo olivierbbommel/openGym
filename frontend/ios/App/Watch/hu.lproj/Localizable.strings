@@ -28,6 +28,8 @@
 "Body weight" = "Testsúly";
 "Less" = "Kevesebb";
 "More" = "Több";
+"Add set" = "Sorozat hozzáadása";
+"Remove set" = "Sorozat eltávolítása";
 "Last time: %@" = "Legutóbb: %@";
 "No workout running" = "Nincs folyamatban edzés";
 "Start one on your iPhone and it shows up here." = "Indíts egyet az iPhone-on, és itt megjelenik.";

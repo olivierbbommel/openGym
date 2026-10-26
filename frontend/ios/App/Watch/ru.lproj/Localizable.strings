@@ -28,6 +28,8 @@
 "Body weight" = "Вес тела";
 "Less" = "Меньше";
 "More" = "Больше";
+"Add set" = "Добавить подход";
+"Remove set" = "Убрать подход";
 "Last time: %@" = "В прошлый раз: %@";
 "No workout running" = "Тренировка не идёт";
 "Start one on your iPhone and it shows up here." = "Начните её на iPhone, и она появится здесь.";

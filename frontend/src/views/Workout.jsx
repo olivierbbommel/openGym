@@ -39,7 +39,7 @@ import { routineChangesFromEntry, updateRoutineFromEntry } from '../lib/routines
 import { sessionNoProg, setSessionNoProg, setEntryNoProg, joinSessionNoProg } from '../lib/session-noprog.js'
 import { glyphOf } from '../lib/glyphs.js'
 import { markAllSetsDone, sessionHistory } from '../lib/backfill.js'
-import { bindWatchActions } from '../lib/watch-sync.js'
+import { bindWatchActions, alignToWatchRows } from '../lib/watch-sync.js'
 import { bestSetFor } from '../lib/exercise-history.js'
 import { bindLiveActions } from '../lib/live-activity.js'
 import { isWarmupRow, isFailureSet, toggleFailure, isDropSet, isRestPauseSet, dropsOf, clustersOf, addDrop, addCluster, removeDropAt, removeClusterAt, setDropAt, setClusterAt, nextDropWeight, nextBurstReps, isSideSet, makeSideSet, setSideField, toggleSide, addSideDrop, removeSideDropAt, setSideDropAt, addSideCluster, removeSideClusterAt, setSideClusterAt, WEIGHT_ORIGIN_MANUAL } from '../lib/workout-model.js'
@@ -1783,6 +1783,10 @@ function ActiveWorkout() {
   // end-of-workout sheet). A row already ticked only takes the numbers.
   const toggleRef = useRef(toggle)
   toggleRef.current = toggle
+  // The watch's changes to the session (a set added or removed there) run the same actions a tap
+  // here runs, then the rows are evened out with the watch's (lib/watch-sync.js alignToWatchRows).
+  const watchEditRef = useRef(null)
+  watchEditRef.current = { addSet }
   // The time is the watch's: the phone may hear of the set much later (lib/finish-workout.js
   // sessionEnd reads the sets' times). The watch's Finish runs the phone's Finish and save.
   useEffect(() => bindWatchActions({
@@ -1813,6 +1817,19 @@ function ActiveWorkout() {
       if (at || hr) mutEntry(idx, en => { const set = en.sets[i]; if (!(oneSide ? set?.sides?.[oneSide]?.done : set?.done)) return; if (at) set.at = at; if (hr) set.hr = hr })
     },
     finish: () => { if (!useStore.getState().S.active?.editingWorkoutId) finishWorkoutNow() },
+    addSet: (idx, rows) => {
+      if (useStore.getState().S.active?.editingWorkoutId) return
+      watchEditRef.current.addSet(idx)
+      if (rows) mutEntry(idx, en => { if (en) en.sets = alignToWatchRows(en.sets, rows) })
+    },
+    removeSet: (idx, i, rows) => {
+      const A = useStore.getState().S.active
+      if (!A || A.editingWorkoutId) return
+      // Only a set not done: the watch never removes one it logged.
+      const set = A.entries?.[idx]?.sets?.[i]
+      if (set && !set.done) deleteActiveSet(idx, i)
+      if (rows) mutEntry(idx, en => { if (en) en.sets = alignToWatchRows(en.sets, rows) })
+    },
   }), [])
 
   // The Lock Screen's Done (lib/live-activity.js) ticks its set through this same toggle, as if

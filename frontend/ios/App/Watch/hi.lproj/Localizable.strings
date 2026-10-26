@@ -28,6 +28,8 @@
 "Body weight" = "शरीर का वज़न";
 "Less" = "कम";
 "More" = "अधिक";
+"Add set" = "सेट जोड़ें";
+"Remove set" = "सेट हटाएँ";
 "Last time: %@" = "पिछली बार: %@";
 "No workout running" = "कोई वर्कआउट नहीं चल रहा";
 "Start one on your iPhone and it shows up here." = "iPhone पर एक शुरू करें, यह यहाँ दिखेगा।";

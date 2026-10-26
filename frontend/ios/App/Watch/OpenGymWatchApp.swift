@@ -294,6 +294,8 @@ struct ExercisePage: View {
     let index: Int
     @State private var editing: EditField?
     @State private var confirmSkip = false
+    /// The exercise's ⋯: sets added or removed, the exercise swapped, another one added.
+    @State private var actions = false
     @Environment(\.dynamicTypeSize) private var typeSize
     @ScaledMetric(relativeTo: .title) private var doneSizeScaled: CGFloat = 58
     /// Large enough to hit, small enough to leave room for the numbers at the largest text sizes.
@@ -361,6 +363,7 @@ struct ExercisePage: View {
             .sheet(item: $editing) { field in
                 ValueEditor(field: field, entry: entry, unit: w.unit)
             }
+            .sheet(isPresented: $actions) { ExerciseActions(index: index) }
             .confirmationDialog(Text("Skip this set?"), isPresented: $confirmSkip) {
                 Button("Skip set") { store.skipSet() }
                 Button("Cancel", role: .cancel) {}
@@ -416,6 +419,17 @@ struct ExercisePage: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             OfflineSign()
             if store.show.showHr { HeartRateBadge(health: store.health) }
+            Button { actions = true } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 26, height: 26)
+                    .background(Circle().fill(Theme.dim))
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("More"))
         }
         // The top row sits just under the clock: it grows less than the numbers do.
         .dynamicTypeSize(...DynamicTypeSize.xLarge)
@@ -452,6 +466,44 @@ struct ExercisePage: View {
         // A long press: skip this set instead (VoiceOver: an action of its own).
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.8).onEnded { _ in if current { confirmSkip = true } })
         .accessibilityAction(named: Text("Skip set")) { store.skipSet() }
+    }
+}
+
+/*
+ * An exercise's ⋯: what changes the session itself, so a workout can run from the wrist with the
+ * phone at home. A list, as the watch's own apps put more actions: each row one change, the
+ * sheet closing on it.
+ */
+struct ExerciseActions: View {
+    @EnvironmentObject var store: SessionStore
+    @Environment(\.dismiss) private var dismiss
+    let index: Int
+
+    var body: some View {
+        if let w = store.workout, w.entries.indices.contains(index) {
+            let entry = w.entries[index]
+            let si = store.setIndex(in: index)
+            List {
+                Text(verbatim: entry.name)
+                    .font(.system(.footnote, design: .rounded).weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .listRowBackground(Color.clear)
+                if !entry.isCardio {
+                    row("plus.circle", Text("Add set")) { store.addSet(in: index) }
+                }
+                // The set up next, the one its dots ring (only one not done; one always stays).
+                if let si = si, entry.sets.count > 1 {
+                    row("minus.circle", Text("Remove set")) { store.removeSet(si, in: index) }
+                }
+            }
+        }
+    }
+
+    private func row(_ symbol: String, _ label: Text, _ action: @escaping () -> Void) -> some View {
+        Button { action(); dismiss() } label: {
+            Label { label } icon: { Image(systemName: symbol).foregroundStyle(Theme.accent) }
+                .frame(minHeight: Theme.tap)
+        }
     }
 }
 

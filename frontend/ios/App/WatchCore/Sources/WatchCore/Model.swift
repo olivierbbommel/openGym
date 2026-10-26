@@ -16,6 +16,9 @@ struct Snapshot: Codable, Equatable {
     /// Apple Health sync ids of workouts deleted in openGym ("opengym-w-<id>", newest first): the
     /// watch takes out the copies it saved itself, which the phone may not delete.
     var healthGone: [String]?
+    /// The ids of the watch's events the phone applied lately: the watch stops laying those of its
+    /// own changes over the snapshot (SessionCore.applySnapshot). A phone that sends none knows none.
+    var applied: [String]?
 }
 
 /// What the watch can start by itself: today's planned session and a few other routines.

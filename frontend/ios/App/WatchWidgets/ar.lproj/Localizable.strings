@@ -28,6 +28,8 @@
 "Body weight" = "وزن الجسم";
 "Less" = "أقل";
 "More" = "أكثر";
+"Add set" = "إضافة مجموعة";
+"Remove set" = "إزالة المجموعة";
 "Last time: %@" = "المرة السابقة: %@";
 "No workout running" = "لا يوجد تمرين جارٍ";
 "Start one on your iPhone and it shows up here." = "ابدأ تمرينًا على iPhone وسيظهر هنا.";
