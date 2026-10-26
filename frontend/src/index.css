@@ -64,6 +64,11 @@
      the bars does not count them twice. */
   --sab:max(env(safe-area-inset-bottom,0px),var(--native-sab,0px));
   --sat:max(env(safe-area-inset-top,0px),var(--native-sat,0px));
+  /* The sides: 0 on most phones. The folded iPhone Duo puts its status pill on the right
+     (about 84pt), and a phone held sideways reports the notch side here. Physical, not
+     logical: the pill is on the right whatever the writing direction. */
+  --sal:max(env(safe-area-inset-left,0px),var(--native-sal,0px));
+  --sar:max(env(safe-area-inset-right,0px),var(--native-sar,0px));
   /* height of the connection indicator under the status bar, 0 while there is none — set by
      components/SyncBanner.jsx. Whatever starts at the top of the screen starts below it. */
   --conn:0px;
@@ -165,7 +170,7 @@ button,.chip,.tile,.item,.wday,.cal-d,.swatch,.hm-c,.lrow,.seg button,.stp butto
 
 /* ---------------------------------------------------------------- layout -- */
 #app{
-  padding:calc(var(--sat) + var(--conn) + 8px) var(--pad) calc(88px + var(--sab));
+  padding:calc(var(--sat) + var(--conn) + 8px) calc(var(--pad) + var(--sar)) calc(88px + var(--sab)) calc(var(--pad) + var(--sal));
   max-width:560px;margin:0 auto;
 }
 /* Android 15 with the keyboard up: room to scroll the last field on a page above the keys.
@@ -197,7 +202,7 @@ body.no-tabbar.resting #app{padding-bottom:calc(96px + var(--sab))}
    that say the changes are kept, so a narrow phone gets a third line rather than an ellipsis. */
 .conn-bar{
   position:fixed;inset-inline-start:0;inset-inline-end:0;top:0;z-index:45;
-  padding:var(--sat) var(--pad) 0;
+  padding:var(--sat) calc(var(--pad) + var(--sar)) 0 calc(var(--pad) + var(--sal));
   background:color-mix(in srgb,var(--bg) 94%,transparent);
   -webkit-backdrop-filter:saturate(180%) blur(10px);backdrop-filter:saturate(180%) blur(10px);
 }
@@ -403,7 +408,7 @@ h4.sec{
 #tabbar{
   position:fixed;inset-inline-start:0;inset-inline-end:0;bottom:0;z-index:50;
   display:flex;justify-content:space-around;align-items:flex-end;
-  padding:7px 6px calc(6px + var(--sab));
+  padding:7px calc(6px + var(--sar)) calc(6px + var(--sab)) calc(6px + var(--sal));
   background:color-mix(in srgb,var(--bg-el) 94%,transparent);
   -webkit-backdrop-filter:saturate(180%) blur(10px);backdrop-filter:saturate(180%) blur(10px);
   border-top:var(--hair) solid var(--sep-op);
@@ -1418,7 +1423,7 @@ body.chips-dragging *{cursor:inherit}
    no tab bar (body.no-tabbar, App.jsx), the bar is docked to the bottom edge; anywhere else it
    sits just above the tab bar. */
 #timer{
-  position:fixed;inset-inline-start:12px;inset-inline-end:12px;bottom:calc(88px + var(--sab));z-index:60;
+  position:fixed;left:calc(12px + var(--sal));right:calc(12px + var(--sar));bottom:calc(88px + var(--sab));z-index:60;
   /* nearly opaque: the set rows underneath were reading through the old 82% and made the
      clock hard to pick out mid-set. The blur stays, so it still sits above the page. */
   background:color-mix(in srgb,var(--surface) 97%,transparent);
@@ -1480,8 +1485,8 @@ body.chips-dragging *{cursor:inherit}
 /* Docked on the workout screen: edge to edge, flush with the bottom, the home indicator's inset
    inside it. */
 body.no-tabbar #timer{
-  inset-inline-start:0;inset-inline-end:0;bottom:0;
-  border-radius:var(--r-xl) var(--r-xl) 0 0;padding:14px 14px calc(10px + var(--sab));
+  left:0;right:0;bottom:0;
+  border-radius:var(--r-xl) var(--r-xl) 0 0;padding:14px calc(14px + var(--sar)) calc(10px + var(--sab)) calc(14px + var(--sal));
   box-shadow:0 -10px 30px -14px rgba(0,0,0,.55);
 }
 body.no-tabbar #timer.working{box-shadow:inset 0 var(--hair) 0 var(--acc),0 -10px 30px -14px rgba(0,0,0,.55)}
@@ -1508,7 +1513,7 @@ body.no-tabbar #timer.working{box-shadow:inset 0 var(--hair) 0 var(--acc),0 -10p
 .sheet{
   position:absolute;inset-inline-start:0;inset-inline-end:0;bottom:0;background:var(--bg-el);
   border-radius:var(--r-xl) var(--r-xl) 0 0;
-  padding:8px 18px calc(20px + var(--sab));
+  padding:8px calc(18px + var(--sar)) calc(20px + var(--sab)) calc(18px + var(--sal));
   /* A tall sheet stops short of the status bar / Dynamic Island: every cap carries the top
      safe-area inset, which the layout viewport does not (viewport-fit=cover). */
   max-height:90vh;max-height:min(90vh,calc(100dvh - var(--sat) - 8px - var(--native-kb,0px)));
@@ -1543,7 +1548,7 @@ body.no-tabbar #timer.working{box-shadow:inset 0 var(--hair) 0 var(--acc),0 -10p
 }
 :root[data-theme="light"] .picker-search{background:var(--bg)}
 .center{
-  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  position:absolute;left:calc(50% + (var(--sal) - var(--sar)) / 2);top:50%;transform:translate(-50%,-50%);
   width:min(84vw,300px);background:var(--bg-el);border-radius:var(--r-lg);padding:20px;
   max-height:calc(100dvh - 2*var(--sat) - 24px);overflow-y:auto;
   box-shadow:0 20px 60px -12px rgba(0,0,0,.5);
@@ -1728,7 +1733,7 @@ button.mchip{border:none;font:inherit;font-size:12px;cursor:pointer}
 
 /* --- toast --- */
 #toast{
-  position:fixed;left:50%;transform:translateX(-50%) translateY(6px);
+  position:fixed;left:calc(50% + (var(--sal) - var(--sar)) / 2);transform:translateX(-50%) translateY(6px);
   bottom:calc(96px + var(--sab));z-index:200;
   background:color-mix(in srgb,var(--surface-2) 88%,transparent);
   -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
