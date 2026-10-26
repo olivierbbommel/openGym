@@ -777,10 +777,25 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     /// One screen of the demo workout (demoJSON: every kind of set), as CI photographs it.
     private func startDemo() {
         let screen = SessionStore.demoScreen ?? "set"
-        if screen != "empty" { apply(json: screen == "idle" ? SessionStore.demoReadyJSON : SessionStore.demoJSON) }
+        let json: String
+        switch screen {
+        case "idle": json = SessionStore.demoReadyJSON
+        // The phone at home: eleven routines to start, the exercises to add or swap in.
+        case "idle-many", "idle-many-end": json = SessionStore.demoManyJSON(active: false)
+        case "actions", "picker", "add-set", "swapped": json = SessionStore.demoManyJSON(active: true)
+        case "freestyle": json = SessionStore.demoFreestyleJSON
+        default: json = SessionStore.demoJSON
+        }
+        if screen != "empty" { apply(json: json) }
         DispatchQueue.main.async {
             switch screen {
-            case "set", "weight", "rest", "offline", "edit-weight", "edit-reps": self.picked[0] = 2
+            case "set", "weight", "rest", "offline", "edit-weight", "edit-reps", "actions": self.picked[0] = 2
+            case "add-set":
+                self.picked[0] = 2
+                self.addSet(in: 0)
+            case "swapped":
+                if let fly = self.picks.first(where: { $0.id == "fly" }) { self.swapExercise(1, to: fly.entry) }
+            case "picker": self.state.entryIndex = self.workout?.entries.count ?? 0
             case "hold": self.state.entryIndex = 1
             case "bodyweight": self.state.entryIndex = 2
             case "side": self.state.entryIndex = 3
@@ -820,6 +835,27 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     {"id":"0025","name":"Bench Press","mode":"reps","restSec":120,"last":null,"sets":[{"w":62.5,"r":8,"sec":null,"done":false,"warmup":false}]}]},
     "others":[{"routineIds":["r2"],"name":"Pull day","entries":[]},{"routineIds":["r3"],"name":"Legs","entries":[]}]}}
     """
+
+    static let demoFreestyleJSON = """
+    {"v":1,"unit":"kg","restSec":90,"ready":null,"active":{"id":"demo","name":"Freestyle","unit":"kg","cur":0,"restSec":90,"rest":null,"start":0,"entries":[]}}
+    """
+
+    /// Eleven routines and a few exercises beside them (text only), with the demo workout running or not.
+    static func demoManyJSON(active: Bool) -> String {
+        let names = ["Push A", "Pull A", "Legs A", "Push B", "Pull B", "Legs B", "Upper", "Lower", "Arms", "Core", "Full body"]
+        let ex = ["Bench Press", "Barbell Row", "Back Squat", "Incline Press", "Pull-up", "Deadlift", "Overhead Press", "Leg Press", "Biceps Curl", "Plank", "Farmer Carry"]
+        let row = #"{"w":40,"r":8,"sec":null,"done":false,"warmup":false}"#
+        let routine: (Int) -> String = { i in
+            #"{"routineIds":["r\#(i)"],"name":"\#(names[i])","entries":[{"id":"e\#(i)","name":"\#(ex[i])","mode":"reps","restSec":null,"last":null,"sets":[\#(row),\#(row),\#(row)]}]}"#
+        }
+        let others = (1..<names.count).map(routine).joined(separator: ",")
+        let parts = (0..<names.count).map { #""e\#($0)":"\#(["Chest", "Back muscles", "Legs"][$0 % 3])""# }.joined(separator: ",")
+        let extra = #"[{"id":"fly","name":"Cable Fly","mode":"reps","restSec":null,"last":"15 kg × 12","sets":[{"w":15,"r":12,"sec":null,"done":false,"warmup":false},{"w":15,"r":12,"sec":null,"done":false,"warmup":false}]},{"id":"facepull","name":"Face Pull","mode":"reps","restSec":null,"last":null,"sets":[{"w":20,"r":15,"sec":null,"done":false,"warmup":false}]}]"#
+        let ready = #"{"today":\#(routine(0)),"others":[\#(others)]}"#
+        let exercises = #"{"recent":["fly","e4","e2"],"parts":{\#(parts),"fly":"Chest","facepull":"Shoulders"},"extra":\#(extra)}"#
+        guard active else { return #"{"v":1,"unit":"kg","restSec":90,"active":null,"ready":\#(ready),"exercises":\#(exercises)}"# }
+        return demoJSON.replacingOccurrences(of: #""ready":null"#, with: #""ready":\#(ready),"exercises":\#(exercises)"#)
+    }
 
     static let demoJSON = """
     {"v":1,"unit":"kg","restSec":90,"ready":null,"active":{"id":"demo","name":"Push day","unit":"kg","cur":0,"restSec":90,"rest":null,"start":0,"entries":[

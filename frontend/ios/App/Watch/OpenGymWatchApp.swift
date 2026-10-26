@@ -210,6 +210,7 @@ struct IdleView: View {
 
     @ViewBuilder private var content: some View {
         if let ready = store.ready, ready.today != nil || !ready.others.isEmpty {
+            ScrollViewReader { reader in
             ScrollView {
                 VStack(spacing: 10) {
                     if let today = ready.today {
@@ -251,8 +252,12 @@ struct IdleView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.top, ready.others.isEmpty ? 6 : 0)
+                    .id("freestyle")
                 }
                 .padding(.horizontal, 4)
+            }
+            // CI: the end of a long list of routines.
+            .onAppear { if SessionStore.demoScreen == "idle-many-end" { reader.scrollTo("freestyle", anchor: .bottom) } }
             }
         } else {
             VStack(spacing: 10) {
@@ -372,6 +377,7 @@ struct ExercisePage: View {
             .onAppear {
                 if current, SessionStore.demoScreen == "edit-weight" { editing = .weight }
                 if current, SessionStore.demoScreen == "edit-reps" { editing = .reps }
+                if current, SessionStore.demoScreen == "actions" { actions = true }
             }
             .sheet(item: $editing) { field in
                 ValueEditor(field: field, entry: entry, unit: w.unit)
@@ -923,6 +929,7 @@ struct FinishPage: View {
             Button("Finish and save") { store.finish() }
             Button("Cancel", role: .cancel) {}
         }
+        .onAppear { if SessionStore.demoScreen == "picker" { adding = true } }
         .sheet(isPresented: $adding) {
             NavigationStack {
                 ExercisePicker(title: Text("Add exercise"), exclude: nil) { store.addExercise($0); adding = false }
