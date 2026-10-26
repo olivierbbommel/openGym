@@ -80,7 +80,9 @@ describe('Home — the way to the Start screen when a plan already owns today', 
     setS({ active: { id: 'a', name: 'Push', start: Date.now(), cur: 0, entries: [] } })
     mount()
     const row = host.querySelector('.today-row')
-    expect(row.querySelector('.ttl').textContent).toBe('Push (in progress)')
+    // the name, and the Resume badge beside it says it is under way
+    expect(row.querySelector('.ttl').textContent).toBe('Push')
+    expect(row.querySelector('.tag').textContent).toBe('Resume')
     expect(row.querySelector('.tag').textContent).toBe('Resume')
   })
 })

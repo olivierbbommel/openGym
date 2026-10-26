@@ -221,7 +221,7 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
     const today = entry.target || {}
     // A pyramid reads as its targets, as on the routine row: "12 · 8 · 6 · Max · 12", never the
     // set count times the first target (#367). Its rows are the plan; nothing moves them.
-    if (isPyramid(today)) return <div className="small dim planline" style={{ marginBottom: 4 }}>{t('Plan: {0}', pyramidLabel(today.pyramid))}</div>
+    if (isPyramid(today)) return <div className="small muted planline" style={{ marginBottom: 4 }}>{t('Plan: {0}', pyramidLabel(today.pyramid))}</div>
     const todaySets = today.sets || planned.sets || 1
     const inPlan = timed
       ? today.sec == null || today.sec === planned.sec
@@ -229,7 +229,7 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
     const note = todaySets !== (planned.sets || 1) || !inPlan
       ? t('today {0}', setsRepsOf({ mode, sets: todaySets, reps: today.reps, sec: today.sec }))
       : entry.carried ? t('reps from your last session') : null
-    return <div className="small dim planline" style={{ marginBottom: 4 }}>
+    return <div className="small muted planline" style={{ marginBottom: 4 }}>
       {t('Plan: {0}', setsRepsOf({ ...planned, mode }))}{note ? ' · ' + note : ''}
     </div>
   })()
@@ -252,7 +252,7 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
   const refAction = refBest ? t('Show last time instead') : t('Show your best set instead')
   // The button's text is the reference, which says nothing about what a tap does; its name
   // carries both, the reference first as it reads on screen, then the switch.
-  const refLine = refText ? <button type="button" className="refline small dim"
+  const refLine = refText ? <button type="button" className="refline small muted"
     title={refAction} aria-label={`${refText}. ${refAction}`}
     onClick={() => update(s => { s.logRef = refBest ? 'last' : 'best' })}>
     {/* Each set on its own left-to-right island. In Arabic the first one followed the label's
@@ -638,7 +638,7 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
       <div className="row" style={{ gap: 2, flex: 'none' }}>
         {entry.note && <button className="iconbtn" aria-label={t('Note')} title={t('Note')} style={{ color: 'var(--acc)' }}
           onClick={() => exerciseNoteSheet(entryIdx)}><Icon name="note" /></button>}
-        <button className="iconbtn" aria-label={t('More')} title={t('More')} onClick={openMore}><Icon name="more" /></button>
+        <button className="iconbtn" aria-label={t('More')} title={t('More')} onClick={openMore}><Icon name="slider" /></button>
       </div>
     </div>
     {/* Kept out of progression: by hand for this session (the ⋯ menu, with its undo right here),

@@ -315,7 +315,9 @@ describe('Home — the today row follows today\'s plan, not just the last sessio
     const wd = new Date(today + 'T12:00:00').getDay()
     setS({ queue: null, week: { [wd]: ['own'] }, workouts: [at('own', Date.now() - 3600000)] })
     mount()
-    expect(todayTitle()).toBe('Core (done)')
+    // the name, and the Done badge beside it says it is done
+    expect(todayTitle()).toBe('Core')
+    expect(host.querySelector('.today-row .tag')?.textContent).toBe('Done')
     expect(tag()).toBe('Done')
   })
 
