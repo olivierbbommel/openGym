@@ -114,7 +114,8 @@ describe('exercises to add or swap in at the wrist', () => {
     const ready = buildReady(S, '2026-10-26')
     const ex = buildExercises(S, ready)
     expect(ex.recent[0]).toBe(loose)
-    expect(ex.recent).not.toContain(cardio)
+    expect(ex.recent).toContain(cardio)   // logged at the wrist now, minutes and speed
+    expect(ex.extra.find(e => e.id === cardio)).toMatchObject({ mode: 'cardio', sets: [{ min: 20, done: false }] })
     const ids0 = ex.extra.map(e => e.id)
     expect(ids0).toContain(loose)
     expect(ids0).toContain(custom)
@@ -188,3 +189,33 @@ describe('a workout started empty at the wrist', () => {
     expect(addExercise).toHaveBeenCalledWith('0001', 0, expect.any(Array))
   })
 })
+
+describe('cardio at the wrist', () => {
+  it('the watch gets each cardio set\'s minutes and speed, and the profile\'s speed unit', () => {
+    const S = { unit: 'lb', active: { id: 'w-1', cur: 0, entries: [{ id: '0025', target: { sets: 1, reps: 8 }, sets: [{ w: 60, r: 8, done: false }] }] } }
+    S.active.entries.push({ id: 'treadmill', target: { mode: 'cardio', sets: 1, min: 20, speed: 8 }, sets: [{ min: 20, speed: 9.66, incline: 3, done: false }] })
+    const snap = buildSnapshot(S)
+    expect(snap.active.entries[1].mode).toBe('cardio')
+    expect(snap.active.entries[1].sets[0]).toMatchObject({ min: 20, speed: 9.66, incline: 3, done: false })
+    expect(snap.active.entries[0].sets[0]).toEqual({ w: 60, r: 8, sec: null, done: false, warmup: false })   // a lift's set as before
+  })
+
+  it('a cardio tick lands with its minutes and speed, in the running workout or the one already saved', () => {
+    const S = { active: { id: 'w-1', entries: [{ id: 'treadmill', sets: [{ min: 20, speed: 8, done: false }] }] }, workouts: [{ id: 'w-0', entries: [] }] }
+    const setDone = vi.fn(), patchSet = vi.fn()
+    bindWatchActions({ setDone })
+    bindWatchAppActions({ patchSet })
+    expect(applyEvents([
+      { id: 'c1', type: 'setDone', wid: 'w-1', exId: 'treadmill', entryIdx: 0, setIdx: 0, min: 25, speed: 9.5, at: 100 },
+      { id: 'c2', type: 'setDone', wid: 'w-0', exId: 'bike', entryIdx: 0, setIdx: 0, min: 30, speed: 20, at: 50 },
+    ], () => ({ S }))).toEqual(['c1', 'c2'])
+    expect(setDone).toHaveBeenCalledWith(0, 0, { w: null, r: null, at: 100, hr: null, min: 25, speed: 9.5 })
+    expect(patchSet).toHaveBeenCalledWith({ wid: 'w-0', exId: 'bike', entryIdx: 0, setIdx: 0 }, { done: true, min: 30, speed: 20, at: 50 }, { ifNewer: 50 })
+  })
+
+  it('a cardio set added at the wrist evens out with the watch\'s minutes and speed', () => {
+    expect(alignToWatchRows([{ min: 20, speed: 8, done: true }], [{ min: 20, speed: 8 }, { min: 15, speed: 10 }]))
+      .toEqual([{ min: 20, speed: 8, done: true }, { min: 15, speed: 10, done: false }])
+  })
+})
+

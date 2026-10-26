@@ -76,6 +76,11 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     @Published var reps: Double = 0 { didSet { if reps != oldValue { ackRestOver() } } }
     /// A hold's seconds, for the set up next (the crown turns it).
     @Published var seconds: Double = 0 { didSet { if seconds != oldValue { ackRestOver() } } }
+    /// A cardio set's minutes and speed (the speed in the profile's unit, as shown).
+    @Published var minutes: Double = 20 { didSet { if minutes != oldValue { ackRestOver() } } }
+    @Published var speed: Double = 0 { didSet { if speed != oldValue { ackRestOver() } } }
+    /// The unit cardio speeds are shown in ("kmh" or "mph"); they are kept in km/h.
+    var speedUnit: String? { state.settings.speedUnit }
     /// A hold running: when it ends, and when it started.
     @Published private(set) var holdEndsAt: Date?
     @Published private(set) var holdStartedAt: Date?
@@ -213,7 +218,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
                 let s = e.sets[si]
                 let added = s.w ?? 0
                 let numbers: String = e.isTimed ? "\(formatNumber(s.sec ?? 0)) s"
-                    : e.isCardio ? ""
+                    : e.isCardio ? "\(formatNumber(s.min ?? 0)) min"
                     : e.isBodyweight ? (added > 0 ? "+\(formatNumber(added)) \(w.unit) × \(formatNumber(s.r ?? 0))" : "× \(formatNumber(s.r ?? 0))")
                     : "\(formatNumber(s.w ?? 0)) \(w.unit) × \(formatNumber(s.r ?? 0))"
                 let work = e.sets.filter { !$0.warmup }.count
@@ -296,6 +301,8 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             reps = s?.r ?? 0
         }
         seconds = s?.sec ?? 30
+        minutes = s?.min ?? 20
+        speed = (Speed.shown(s?.speed ?? 0, unit: speedUnit) * 10).rounded() / 10
     }
 
     /* ---------- what the lifter does here ---------- */
@@ -314,15 +321,19 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         closeRest(at: now)
         let hr = health.stats(from: setFrom, to: now)
         let side = e.sets[si].sideUp
-        var tw: Double? = nil, tr: Double? = nil, tsec: Double? = nil
-        if e.isTimed {
+        var tw: Double? = nil, tr: Double? = nil, tsec: Double? = nil, tmin: Double? = nil, tspeed: Double? = nil
+        if e.isCardio {
+            // The minutes, and the speed where the exercise has one (kept in km/h, as on the phone).
+            tmin = max(1, minutes.rounded())
+            if (e.sets[si].speed ?? 0) > 0 || speed > 0 { tspeed = Speed.stored(max(0, speed), unit: speedUnit) }
+        } else if e.isTimed {
             tsec = heldFor ?? seconds
             if (e.sets[si].w ?? 0) > 0 { tw = weight }       // a weighted hold keeps its weight
         } else if !e.isCardio {
             tw = weight
             tr = reps
         }
-        let (next, event) = SessionCore.tick(state, entry: ei, set: si, side: side, w: tw, r: tr, sec: tsec,
+        let (next, event) = SessionCore.tick(state, entry: ei, set: si, side: side, w: tw, r: tr, sec: tsec, min: tmin, speed: tspeed,
                                              at: now.timeIntervalSince1970 * 1000, id: UUID().uuidString, hr: hr)
         // Sent first, saved second: killed in between, the phone still has the tick (and the next
         // snapshot brings it back here); the other way round the tick would be lost on the phone.
@@ -784,6 +795,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         case "idle-many", "idle-many-end": json = SessionStore.demoManyJSON(active: false)
         case "actions", "picker", "add-set", "swapped": json = SessionStore.demoManyJSON(active: true)
         case "freestyle": json = SessionStore.demoFreestyleJSON
+        case "cardio", "edit-speed": json = SessionStore.demoCardioJSON
         default: json = SessionStore.demoJSON
         }
         if screen != "empty" { apply(json: json) }
@@ -834,6 +846,12 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     {"v":1,"unit":"kg","restSec":90,"active":null,"ready":{"today":{"routineIds":["r1"],"name":"Push day","entries":[
     {"id":"0025","name":"Bench Press","mode":"reps","restSec":120,"last":null,"sets":[{"w":62.5,"r":8,"sec":null,"done":false,"warmup":false}]}]},
     "others":[{"routineIds":["r2"],"name":"Pull day","entries":[]},{"routineIds":["r3"],"name":"Legs","entries":[]}]}}
+    """
+
+    static let demoCardioJSON = """
+    {"v":1,"unit":"kg","restSec":90,"ready":null,"settings":{"speedUnit":"kmh"},"active":{"id":"demo","name":"Cardio","unit":"kg","cur":0,"restSec":90,"rest":null,"start":0,"entries":[
+    {"id":"treadmill","name":"Treadmill","mode":"cardio","restSec":null,"last":"20 min @ 9.5 km/h","sets":[
+    {"w":null,"r":null,"sec":null,"done":false,"warmup":false,"min":20,"speed":9.5},{"w":null,"r":null,"sec":null,"done":false,"warmup":false,"min":10,"speed":11}]}]}}
     """
 
     static let demoFreestyleJSON = """

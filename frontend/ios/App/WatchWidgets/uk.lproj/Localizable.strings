@@ -34,6 +34,9 @@
 "Swap exercise" = "Замінити вправу";
 "Search…" = "Пошук…";
 "Freestyle" = "Довільна";
+"Minutes" = "Хвилини";
+"Speed (km/h)" = "Швидкість (км/год)";
+"Speed (mph)" = "Швидкість (миль/год)";
 "Last time: %@" = "Минулого разу: %@";
 "Recent" = "Нещодавні";
 "No workout running" = "Тренування не триває";
@@ -50,7 +53,6 @@
 "Workout saved" = "Тренування збережено";
 "Ended on your iPhone" = "Завершено на iPhone";
 "Tap a dot to do a skipped set." = "Торкнись точки, щоб зробити пропущений підхід.";
-"Log this one on your iPhone." = "Це записуй на iPhone.";
 "Saved on the watch, syncs later" = "Збережено на годиннику, синхронізується пізніше";
 "Skip this set?" = "Пропустити цей підхід?";
 "Turn the Digital Crown to change it." = "Поверни Digital Crown, щоб змінити.";

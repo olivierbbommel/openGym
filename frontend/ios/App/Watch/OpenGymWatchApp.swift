@@ -297,7 +297,7 @@ struct ExercisePager: View {
 
 /// What a tap on a number opens for editing.
 enum EditField: String, Identifiable {
-    case weight, reps, seconds
+    case weight, reps, seconds, minutes, speed
     var id: String { rawValue }
 }
 
@@ -331,11 +331,7 @@ struct ExercisePage: View {
                     let row = entry.sets[si]
                     tags(entry, row)
                     if entry.isCardio {
-                        Text("Log this one on your iPhone.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .minimumScaleFactor(0.7)
+                        cardio(row, current: current)
                     } else if entry.isTimed {
                         ValueTile(value: formatNumber(current ? store.seconds : (row.sec ?? 0)), unit: "s", label: Text("Hold"),
                                   tint: .white, large: true) { if current { editing = .seconds } }
@@ -378,6 +374,7 @@ struct ExercisePage: View {
                 if current, SessionStore.demoScreen == "edit-weight" { editing = .weight }
                 if current, SessionStore.demoScreen == "edit-reps" { editing = .reps }
                 if current, SessionStore.demoScreen == "actions" { actions = true }
+                if current, SessionStore.demoScreen == "edit-speed" { editing = .speed }
             }
             .sheet(item: $editing) { field in
                 ValueEditor(field: field, entry: entry, unit: w.unit)
@@ -387,6 +384,21 @@ struct ExercisePage: View {
                 Button("Skip set") { store.skipSet() }
                 Button("Cancel", role: .cancel) {}
             }
+        }
+    }
+
+    /// Cardio as tiles: the minutes, and the speed where the exercise has one (in the profile's unit).
+    @ViewBuilder private func cardio(_ row: SetRow, current: Bool) -> some View {
+        let minutes = current ? store.minutes : (row.min ?? 0)
+        let speed = current ? store.speed : Speed.shown(row.speed ?? 0, unit: store.speedUnit)
+        if (row.speed ?? 0) > 0 || (current && store.speed > 0) {
+            HStack(spacing: 5) {
+                ValueTile(value: formatNumber(minutes), unit: "min", label: Text("Minutes")) { if current { editing = .minutes } }
+                ValueTile(value: formatNumber((speed * 10).rounded() / 10), unit: Speed.label(store.speedUnit),
+                          label: store.speedUnit == "mph" ? Text("Speed (mph)") : Text("Speed (km/h)")) { if current { editing = .speed } }
+            }
+        } else {
+            ValueTile(value: formatNumber(minutes), unit: "min", label: Text("Minutes"), large: true) { if current { editing = .minutes } }
         }
     }
 
@@ -509,9 +521,7 @@ struct ExerciseActions: View {
                         .font(.system(.footnote, design: .rounded).weight(.semibold))
                         .foregroundStyle(.secondary)
                         .listRowBackground(Color.clear)
-                    if !entry.isCardio {
-                        row("plus.circle", Text("Add set")) { store.addSet(in: index) }
-                    }
+                    row("plus.circle", Text("Add set")) { store.addSet(in: index) }
                     // The set up next, the one its dots ring (only one not done; one always stays).
                     if let si = si, entry.sets.count > 1 {
                         row("minus.circle", Text("Remove set")) { store.removeSet(si, in: index) }
@@ -589,6 +599,7 @@ struct ExercisePicker: View {
         guard let first = work.first ?? e.sets.first else { return "" }
         let n = max(1, work.count)
         if e.isTimed { return "\(n) × \(formatNumber(first.sec ?? 0)) s" }
+        if e.isCardio { return "\(n) × \(formatNumber(first.min ?? 0)) min" }
         let reps = "\(n) × \(formatNumber(first.r ?? 0))"
         let w = first.w ?? 0
         return w > 0 ? "\(reps) · \(e.isBodyweight ? "+" : "")\(formatNumber(w)) \(unit)" : reps
@@ -687,6 +698,8 @@ struct ValueEditor: View {
         case .weight: return entry.step.flatMap { $0 > 0 ? $0 : nil } ?? store.weightStep
         case .reps: return 1
         case .seconds: return 5
+        case .minutes: return 1
+        case .speed: return store.speedUnit == "mph" ? 0.1 : 0.5
         }
     }
     private var range: ClosedRange<Double> {
@@ -694,6 +707,8 @@ struct ValueEditor: View {
         case .weight: return 0...(unit == "lb" ? 1500 : 700)
         case .reps: return 0...200
         case .seconds: return 5...3600
+        case .minutes: return 1...600
+        case .speed: return 0...60
         }
     }
     private var title: Text {
@@ -701,6 +716,8 @@ struct ValueEditor: View {
         case .weight: return entry.isBodyweight ? Text("Added weight") : Text("Weight")
         case .reps: return Text("Reps")
         case .seconds: return Text("Hold")
+        case .minutes: return Text("Minutes")
+        case .speed: return store.speedUnit == "mph" ? Text("Speed (mph)") : Text("Speed (km/h)")
         }
     }
     private var suffix: String? {
@@ -708,6 +725,8 @@ struct ValueEditor: View {
         case .weight: return unit
         case .reps: return nil
         case .seconds: return "s"
+        case .minutes: return "min"
+        case .speed: return Speed.label(store.speedUnit)
         }
     }
 
@@ -762,6 +781,8 @@ struct ValueEditor: View {
             case .weight: value = store.weight
             case .reps: value = store.reps
             case .seconds: value = store.seconds
+            case .minutes: value = store.minutes
+            case .speed: value = store.speed
             }
             focused = true
         }
@@ -780,6 +801,8 @@ struct ValueEditor: View {
         case .weight: store.weight = max(0, value)
         case .reps: store.reps = max(0, value.rounded())
         case .seconds: store.seconds = max(5, value)
+        case .minutes: store.minutes = max(1, value.rounded())
+        case .speed: store.speed = max(0, (value * 10).rounded() / 10)
         }
     }
 

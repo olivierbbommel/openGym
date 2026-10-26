@@ -34,6 +34,9 @@
 "Swap exercise" = "Gyakorlat cseréje";
 "Search…" = "Keresés…";
 "Freestyle" = "Szabad edzés";
+"Minutes" = "Perc";
+"Speed (km/h)" = "Sebesség (km/h)";
+"Speed (mph)" = "Sebesség (mph)";
 "Last time: %@" = "Legutóbb: %@";
 "Recent" = "Legutóbbiak";
 "No workout running" = "Nincs folyamatban edzés";
@@ -50,7 +53,6 @@
 "Workout saved" = "Edzés mentve";
 "Ended on your iPhone" = "Az iPhone-on befejezve";
 "Tap a dot to do a skipped set." = "Koppints egy pöttyre egy kihagyott sorozathoz.";
-"Log this one on your iPhone." = "Ezt az iPhone-on rögzítsd.";
 "Saved on the watch, syncs later" = "Az órán mentve, később szinkronizál";
 "Skip this set?" = "Kihagyod ezt a sorozatot?";
 "Turn the Digital Crown to change it." = "Forgasd a Digital Crownt a módosításhoz.";

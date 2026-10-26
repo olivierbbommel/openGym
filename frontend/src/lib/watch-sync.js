@@ -15,7 +15,7 @@
 // The iPhone app only. Without a paired watch with the app on it, nothing is sent and nothing
 // arrives: the phone behaves exactly as before.
 import { MOBILE, nativePlatform } from './mobile.js'
-import { EXIDX, gifSrc, figureOf, isAssisted, isCardio as isCardioEx } from './exercises.js'
+import { EXIDX, gifSrc, figureOf, isAssisted } from './exercises.js'
 import { packId, packDrawingId } from './anim-quality.js'
 import { getState as animPacks } from './anim-packs.js'
 import { t, exerciseNameFor, getLang, baseLang, onLangChange } from './i18n.js'
@@ -27,6 +27,7 @@ import { sessionHistory } from './backfill.js'
 import { buildCombinedEntries, deriveSessionName } from './session-merge.js'
 import { todayISO } from './format.js'
 import { sanitizeHr } from './heart-rate.js'
+import { speedUnitOf } from './speed.js'
 import { readWatchPrefs, settingsForWatch, writeWatchStatus, onWatchPrefs } from './watch-settings.js'
 
 export const SNAPSHOT_VERSION = 1
@@ -44,7 +45,13 @@ const okBw = v => { const n = num(v); return n != null && n > 0 && n < 700 }
 // One side of a per-side set, from the watch: 'L', 'R', or none (the whole set).
 const sideOf = v => (v === 'L' || v === 'R' ? v : null)
 // What a tick of a hold (`sec`) or of one side carries besides the numbers; nothing for a plain set.
-const extraOf = ev => ({ ...(num(ev.sec) != null ? { sec: num(ev.sec) } : {}), ...(sideOf(ev.side) ? { side: sideOf(ev.side) } : {}) })
+const extraOf = ev => ({
+  ...(num(ev.sec) != null ? { sec: num(ev.sec) } : {}),
+  ...(sideOf(ev.side) ? { side: sideOf(ev.side) } : {}),
+  // a cardio set's minutes and speed (km/h, as the phone keeps it)
+  ...(num(ev.min) != null ? { min: num(ev.min) } : {}),
+  ...(num(ev.speed) != null ? { speed: num(ev.speed) } : {}),
+})
 
 /* ---------- the snapshot ---------- */
 
@@ -75,6 +82,10 @@ function watchSet (s) {
     // when it was ticked: of two ticks of the same set (phone and watch), the later wins
     ...(num(s.at) ? { at: num(s.at) } : {}),
     ...(isSideSet(s) ? { sides: { L: sideRow(s.sides.L), R: sideRow(s.sides.R) } } : {}),
+    // cardio: minutes, speed (km/h) and incline, which the watch now logs too
+    ...(num(s.min) != null ? { min: num(s.min) } : {}),
+    ...(num(s.speed) != null ? { speed: num(s.speed) } : {}),
+    ...(num(s.incline) != null ? { incline: num(s.incline) } : {}),
   }
 }
 
@@ -146,8 +157,8 @@ const fresh = s => (isSideSet(s)
  * exercise of the ready routines (the watch takes those from `ready`, as they would be built
  * there), plus the ones done lately or made by the lifter that no routine has (`extra`, each with
  * last time's work sets, or the phone's defaults for a new one). `recent` names the latest done,
- * newest first; `parts` the body part of each, for the watch's list. Cardio stays out: the watch
- * leaves it to the phone.
+ * newest first; `parts` the body part of each, for the watch's list. Cardio too: the watch logs
+ * its minutes and speed.
  */
 export function buildExercises (S, ready) {
   let H = null
@@ -156,10 +167,10 @@ export function buildExercises (S, ready) {
   const recent = []
   const byNewest = [...(S?.workouts || [])].filter(w => w && Array.isArray(w.entries)).sort((a, b) => String(b.d || '').localeCompare(String(a.d || '')))
   for (const w of byNewest) {
-    for (const e of w.entries) if (e?.id && !isCardioEx(e.id) && !recent.includes(e.id)) recent.push(e.id)
+    for (const e of w.entries) if (e?.id && !recent.includes(e.id)) recent.push(e.id)
     if (recent.length >= RECENT_MAX) break
   }
-  const custom = (S?.customEx || []).map(x => x && x.id).filter(id => typeof id === 'string' && !isCardioEx(id))
+  const custom = (S?.customEx || []).map(x => x && x.id).filter(id => typeof id === 'string')
   const extraIds = [...new Set([...recent, ...custom])].filter(id => !fromReady.includes(id)).slice(0, EXTRA_MAX)
   const extra = []
   for (const id of extraIds) {
@@ -167,7 +178,9 @@ export function buildExercises (S, ready) {
       const cfg = { ...freestyleConfig(H, { id, ...defaultConfig(id) }), id }
       const last = lastEntryFor(H, id)
       const work = last && Array.isArray(last.sets) ? last.sets.filter(s => s && !isWarmupRow(s)).map(fresh) : []
-      const rows = work.length ? work : Array.from({ length: Math.max(1, cfg.sets || 3) }, () => ({ w: num(cfg.weight) || 0, r: num(cfg.reps), sec: num(cfg.sec), done: false }))
+      const rows = work.length ? work : Array.from({ length: Math.max(1, cfg.sets || 3) }, () => (modeOf(cfg) === 'cardio'
+        ? { min: num(cfg.min) || 20, speed: num(cfg.speed) || 0, done: false }
+        : { w: num(cfg.weight) || 0, r: num(cfg.reps), sec: num(cfg.sec), done: false }))
       extra.push(watchEntry({ id, target: cfg, sets: rows }, H, S))
     } catch { /* an exercise that no longer exists: left out */ }
   }
@@ -245,7 +258,10 @@ const writeApplied = ids => { try { localStorage.setItem(APPLIED_KEY, JSON.strin
 const ROWS_MAX = 50
 function rowsOf (v) {
   if (!Array.isArray(v)) return null
-  return v.slice(0, ROWS_MAX).filter(x => x && typeof x === 'object').map(x => ({ w: num(x.w), r: num(x.r), sec: num(x.sec), warmup: x.warmup === true }))
+  return v.slice(0, ROWS_MAX).filter(x => x && typeof x === 'object').map(x => ({
+    w: num(x.w), r: num(x.r), sec: num(x.sec), warmup: x.warmup === true,
+    ...(num(x.min) != null ? { min: num(x.min) } : {}), ...(num(x.speed) != null ? { speed: num(x.speed) } : {}),
+  }))
 }
 
 /**
@@ -279,6 +295,8 @@ export function alignToWatchRows (sets, rows) {
     if (row.w != null) next.w = row.w
     if (row.r != null) next.r = row.r
     if (row.sec != null) next.sec = row.sec
+    if (row.min != null) next.min = row.min
+    if (row.speed != null) next.speed = row.speed
     return next
   })
 }
@@ -336,7 +354,8 @@ export function applyEvents (events, getState) {
       // A workout already running on the phone is kept; one with the watch's id is this one.
     } else if (ev.type === 'setDone' && saved) {
       if (!appHandlers) break
-      const fields = { done: true, ...(num(ev.w) != null ? { w: num(ev.w) } : {}), ...(num(ev.r) != null ? { r: num(ev.r) } : {}), ...(num(ev.sec) != null ? { sec: num(ev.sec) } : {}), ...(num(ev.at) ? { at: num(ev.at) } : {}) }
+      const { side: _side, ...more } = extraOf(ev)
+      const fields = { done: true, ...(num(ev.w) != null ? { w: num(ev.w) } : {}), ...(num(ev.r) != null ? { r: num(ev.r) } : {}), ...more, ...(num(ev.at) ? { at: num(ev.at) } : {}) }
       const hr = sanitizeHr(ev.hr)
       if (hr) fields.hr = hr
       appHandlers.patchSet({ wid: ev.wid, exId: ev.exId, entryIdx: ev.entryIdx, setIdx: ev.setIdx, ...(sideOf(ev.side) ? { side: sideOf(ev.side) } : {}) }, fields, { ifNewer: num(ev.at) })
@@ -559,6 +578,8 @@ export function watchExtras (S) {
   return {
     lang,
     weighIn: S?.weighIn !== false,
+    // cardio speeds are kept in km/h; the watch shows them in the profile's unit
+    speedUnit: speedUnitOf(S),
     ...(bw && num(bw.w) ? { lastBw: num(bw.w) } : {}),
   }
 }

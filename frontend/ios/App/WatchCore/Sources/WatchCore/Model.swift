@@ -130,6 +130,10 @@ struct SetRow: Codable, Equatable {
     var at: Double?
     /// A per-side set's two sides; `done` is both of them.
     var sides: Sides?
+    /// Cardio: the minutes, the speed (km/h, as the phone keeps it) and the incline (%).
+    var min: Double?
+    var speed: Double?
+    var incline: Double?
 
     /// The side up next on a per-side set ("L", then "R"), or nil.
     var sideUp: String? {
@@ -156,6 +160,8 @@ struct WatchSettings: Codable, Equatable {
     var lastBw: Double?
     /// What the watch shows during a workout (Settings → Apple Watch); nil is the default.
     var show: WatchShow?
+    /// The unit cardio speeds are shown in: "kmh" (default) or "mph". They are kept in km/h.
+    var speedUnit: String?
 }
 
 /// What a workout screen shows. Each nil means its default.
@@ -182,4 +188,21 @@ struct WatchShow: Codable, Equatable {
     var showKcal: Bool { kcal ?? false }
     var showNext: Bool { next ?? true }
     var restRing: Bool { rest != "plain" }
+}
+
+/// Cardio speeds: kept in km/h, shown in the profile's unit (frontend lib/speed.js).
+enum Speed {
+    static let kmhPerMph = 1.609344
+
+    /// What the screen shows for a stored km/h speed.
+    static func shown(_ kmh: Double, unit: String?) -> Double {
+        unit == "mph" ? kmh / kmhPerMph : kmh
+    }
+
+    /// What is stored for a speed as shown: in mph, kept to hundredths of a km/h, as the phone does.
+    static func stored(_ value: Double, unit: String?) -> Double {
+        unit == "mph" ? (value * kmhPerMph * 100).rounded() / 100 : value
+    }
+
+    static func label(_ unit: String?) -> String { unit == "mph" ? "mph" : "km/h" }
 }

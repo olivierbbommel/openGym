@@ -34,6 +34,9 @@
 "Swap exercise" = "更换动作";
 "Search…" = "搜索…";
 "Freestyle" = "自由训练";
+"Minutes" = "分钟";
+"Speed (km/h)" = "速度（km/h）";
+"Speed (mph)" = "速度（mph）";
 "Last time: %@" = "上次: %@";
 "Recent" = "最近";
 "No workout running" = "没有进行中的训练";
@@ -50,7 +53,6 @@
 "Workout saved" = "训练已保存";
 "Ended on your iPhone" = "已在 iPhone 上结束";
 "Tap a dot to do a skipped set." = "轻点圆点来做跳过的组。";
-"Log this one on your iPhone." = "这个请在 iPhone 上记录。";
 "Saved on the watch, syncs later" = "已存在手表上，稍后同步";
 "Skip this set?" = "跳过这一组？";
 "Turn the Digital Crown to change it." = "转动数码表冠来更改。";

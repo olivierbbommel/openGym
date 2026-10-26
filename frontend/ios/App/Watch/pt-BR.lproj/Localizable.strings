@@ -34,6 +34,9 @@
 "Swap exercise" = "Trocar exercício";
 "Search…" = "Buscar…";
 "Freestyle" = "Livre";
+"Minutes" = "Minutos";
+"Speed (km/h)" = "Velocidade (km/h)";
+"Speed (mph)" = "Velocidade (mph)";
 "Last time: %@" = "Da última vez: %@";
 "Recent" = "Recentes";
 "No workout running" = "Nenhum treino em andamento";
@@ -50,7 +53,6 @@
 "Workout saved" = "Treino salvo";
 "Ended on your iPhone" = "Encerrado no iPhone";
 "Tap a dot to do a skipped set." = "Toque num ponto para fazer uma série pulada.";
-"Log this one on your iPhone." = "Este você registra no iPhone.";
 "Saved on the watch, syncs later" = "Salvo no relógio, sincroniza depois";
 "Skip this set?" = "Pular esta série?";
 "Turn the Digital Crown to change it." = "Gire a Digital Crown para mudar.";

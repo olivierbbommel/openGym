@@ -113,7 +113,7 @@ final class PhoneAtHomeTests: XCTestCase {
         return e
     }
 
-    func testThePickListHasTheRoutinesExercisesThenThePhonesOthersEachOnceNotDoneNoCardio() {
+    func testThePickListHasTheRoutinesExercisesThenThePhonesOthersEachOnceNotDone() {
         var s = SessionState()
         s.ready = Ready(today: ReadySession(routineIds: ["r1"], name: "Push", entries: [entry("0025", [row(60, 8, done: true, at: 1)])]),
                         others: [ReadySession(routineIds: ["r2"], name: "Pull", entries: [entry("0025", [row(1, 1)]), entry("pull", [row(0, 8)])])])
@@ -121,7 +121,7 @@ final class PhoneAtHomeTests: XCTestCase {
         cardio.mode = "cardio"
         s.catalog = ExerciseCatalog(recent: ["fly", "pull"], parts: ["0025": "Chest", "fly": "Chest"], extra: [entry("fly", [row(12, 12)]), cardio])
         let p = SessionCore.picks(s)
-        XCTAssertEqual(p.map(\.id), ["0025", "pull", "fly"])
+        XCTAssertEqual(p.map(\.id), ["0025", "pull", "fly", "run"], "cardio too, logged here now")
         XCTAssertEqual(p[0].entry.sets[0].done, false, "as it would start")
         XCTAssertEqual(p[0].entry.sets[0].w, 60)
         XCTAssertEqual(p[0].part, "Chest")
@@ -205,6 +205,52 @@ final class PhoneAtHomeTests: XCTestCase {
         // started here and not confirmed yet: a snapshot without it keeps it, changes and all
         let s3 = SessionCore.applySnapshot(s2, Snapshot(v: 1, unit: "kg", restSec: 90, active: nil, ready: nil, settings: nil, applied: []))
         XCTAssertEqual(s3.workout?.entries.map(\.id), ["fly", "row"])
+    }
+
+    /* ---------- cardio at the wrist ---------- */
+
+    func cardio(_ sets: [SetRow]) -> Entry { Entry(id: "treadmill", name: "Treadmill", mode: "cardio", restSec: nil, last: nil, sets: sets) }
+    func run(_ min: Double, _ speed: Double, done: Bool = false, at: Double? = nil) -> SetRow {
+        SetRow(w: nil, r: nil, sec: nil, done: done, warmup: false, at: at, min: min, speed: speed)
+    }
+
+    func testACardioTickCarriesItsMinutesAndSpeedAndHoldsOverAnOlderSnapshot() {
+        var s0 = SessionState()
+        s0.workout = ActiveWorkout(id: "p1", name: "Run", unit: "kg", cur: 0, restSec: 90, rest: nil, entries: [cardio([run(20, 8), run(20, 8)])])
+        let (s, ev) = SessionCore.tick(s0, entry: 0, set: 0, w: nil, r: nil, min: 25, speed: 9.5, at: 10, id: "t1")
+        XCTAssertEqual(ev?["min"] as? Double, 25)
+        XCTAssertEqual(ev?["speed"] as? Double, 9.5)
+        XCTAssertNil(ev?["w"])
+        XCTAssertEqual(s.workout?.entries[0].sets[0], run(25, 9.5, done: true, at: 10))
+        var w = s0.workout!
+        w.cur = 0
+        let back = SessionCore.applySnapshot(s, Snapshot(v: 1, unit: "kg", restSec: 90, active: w, ready: nil, settings: nil, applied: []))
+        XCTAssertEqual(back.workout?.entries[0].sets[0].min, 25)
+        XCTAssertEqual(back.workout?.entries[0].sets[0].speed, 9.5)
+    }
+
+    func testCardioGetsSetsAddedAndIsInThePickList() {
+        var s0 = SessionState()
+        var last = run(30, 10)
+        last.incline = 4
+        s0.workout = ActiveWorkout(id: "p1", name: "Run", unit: "kg", cur: 0, restSec: 90, rest: nil, entries: [cardio([last])])
+        let (s, ev) = SessionCore.addSet(s0, entry: 0, at: 1, id: "a1")
+        XCTAssertEqual(s.workout?.entries[0].sets[1].min, 30)
+        XCTAssertEqual(s.workout?.entries[0].sets[1].speed, 10)
+        XCTAssertEqual(s.workout?.entries[0].sets[1].incline, 4)
+        XCTAssertEqual((ev?["rows"] as? [[String: Any]])?[1]["min"] as? Double, 30)
+        var r = SessionState()
+        r.ready = Ready(today: ReadySession(routineIds: ["r"], name: "Run", entries: [cardio([run(20, 8)])]), others: [])
+        XCTAssertEqual(SessionCore.picks(r).map(\.id), ["treadmill"])
+    }
+
+    func testSpeedsAreShownInTheProfilesUnitAndKeptInKmh() {
+        XCTAssertEqual(Speed.shown(9.66, unit: "kmh"), 9.66)
+        XCTAssertEqual(Speed.shown(Speed.kmhPerMph * 6, unit: "mph"), 6, accuracy: 0.0001)
+        XCTAssertEqual(Speed.stored(6, unit: "mph"), 9.66)
+        XCTAssertEqual(Speed.stored(8.5, unit: nil), 8.5)
+        XCTAssertEqual(Speed.label("mph"), "mph")
+        XCTAssertEqual(Speed.label(nil), "km/h")
     }
 }
 

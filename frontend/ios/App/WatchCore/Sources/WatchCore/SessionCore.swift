@@ -39,6 +39,9 @@ struct PendingTick: Codable, Equatable {
     var at: Double
     /// A hold's seconds.
     var sec: Double?
+    /// Cardio: minutes and speed (km/h).
+    var min: Double?
+    var speed: Double?
 }
 
 struct SessionState: Codable, Equatable {
@@ -141,6 +144,8 @@ enum SessionCore {
                         next.entries[ei].sets[si].w = p.w ?? row.w
                         next.entries[ei].sets[si].r = p.r ?? row.r
                         if let sec = p.sec { next.entries[ei].sets[si].sec = sec }
+                        if let m = p.min { next.entries[ei].sets[si].min = m }
+                        if let v = p.speed { next.entries[ei].sets[si].speed = v }
                         next.entries[ei].sets[si].at = p.at
                     }
                 }
@@ -183,8 +188,9 @@ enum SessionCore {
     }
 
     /// A set ticked here: the state with it done, and the event for the phone. `side` ticks one
-    /// side of a per-side set; `sec` is a hold's seconds; a cardio tick carries no numbers.
+    /// side of a per-side set; `sec` is a hold's seconds; a cardio set carries its minutes and speed.
     static func tick(_ s0: SessionState, entry ei: Int, set si: Int, side: String? = nil, w: Double?, r: Double?, sec: Double? = nil,
+                     min: Double? = nil, speed: Double? = nil,
                      at: Double, id: String, hr: [String: Double]? = nil) -> (SessionState, Event?) {
         guard var workout = s0.workout, workout.entries.indices.contains(ei), workout.entries[ei].sets.indices.contains(si) else { return (s0, nil) }
         var s = s0
@@ -197,10 +203,12 @@ enum SessionCore {
             if let w = w { workout.entries[ei].sets[si].w = w }
             if let r = r { workout.entries[ei].sets[si].r = r }
             if let sec = sec { workout.entries[ei].sets[si].sec = sec }
+            if let m = min { workout.entries[ei].sets[si].min = m }
+            if let v = speed { workout.entries[ei].sets[si].speed = v }
             workout.entries[ei].sets[si].at = at
         }
         s.workout = workout
-        s.pending[key(e.id, si, oneSide)] = PendingTick(w: w, r: r, at: at, sec: sec)
+        s.pending[key(e.id, si, oneSide)] = PendingTick(w: w, r: r, at: at, sec: sec, min: min, speed: speed)
         var event: Event = [
             "id": id, "type": "setDone", "wid": workout.id ?? "", "exId": e.id,
             "entryIdx": ei, "setIdx": si, "at": at,
@@ -208,6 +216,8 @@ enum SessionCore {
         if let w = w { event["w"] = w }
         if let r = r { event["r"] = r }
         if let sec = sec { event["sec"] = sec }
+        if let m = min { event["min"] = m }
+        if let v = speed { event["speed"] = v }
         if let side = oneSide { event["side"] = side }
         if let hr = hr { event["hr"] = hr }
         return (s, event)
@@ -251,6 +261,8 @@ enum SessionCore {
             if let w = row.w { out["w"] = w }
             if let r = row.r { out["r"] = r }
             if let sec = row.sec { out["sec"] = sec }
+            if let m = row.min { out["min"] = m }
+            if let v = row.speed { out["speed"] = v }
             return out
         }
     }
@@ -259,7 +271,7 @@ enum SessionCore {
     static func freshRow(like base: SetRow?) -> SetRow {
         guard let b = base else { return SetRow(w: 0, r: 10, sec: nil, done: false, warmup: false) }
         let sides = b.sides.map { Sides(L: SideRow(w: $0.L.w, r: $0.L.r, done: false), R: SideRow(w: $0.R.w, r: $0.R.r, done: false)) }
-        return SetRow(w: b.w, r: b.r, sec: b.sec, done: false, warmup: false, at: nil, sides: sides)
+        return SetRow(w: b.w, r: b.r, sec: b.sec, done: false, warmup: false, at: nil, sides: sides, min: b.min, speed: b.speed, incline: b.incline)
     }
 
     private static func remember(_ s: inout SessionState, _ e: WatchEdit) {
@@ -267,9 +279,9 @@ enum SessionCore {
     }
 
     /// One more set on exercise `ei`, a copy of its last one (a hold done one side at a time gets
-    /// one for each side, as on the phone). Not for cardio, which is logged on the phone.
+    /// one for each side, as on the phone; cardio its minutes, speed and incline).
     static func addSet(_ s0: SessionState, entry ei: Int, at: Double, id: String) -> (SessionState, Event?) {
-        guard var w = s0.workout, w.entries.indices.contains(ei), !w.entries[ei].isCardio else { return (s0, nil) }
+        guard var w = s0.workout, w.entries.indices.contains(ei) else { return (s0, nil) }
         var s = s0
         let e = w.entries[ei]
         let row = freshRow(like: e.sets.last(where: { !$0.warmup }) ?? e.sets.last)
@@ -315,7 +327,7 @@ enum SessionCore {
     }
 
     /// What the watch can add or swap in: the ready routines' exercises (as they would start
-    /// there), then the phone's others, each once, cardio left to the phone. Recent ones carry
+    /// there), then the phone's others, each once. Recent ones carry
     /// their place among the recent.
     static func picks(_ s: SessionState) -> [Pick] {
         let recent = s.catalog?.recent ?? []
@@ -323,7 +335,7 @@ enum SessionCore {
         var seen = Set<String>()
         var out: [Pick] = []
         let all = (s.ready?.today?.entries ?? []) + (s.ready?.others ?? []).flatMap { $0.entries } + (s.catalog?.extra ?? [])
-        for e in all where !e.isCardio && !seen.contains(e.id) {
+        for e in all where !seen.contains(e.id) {
             seen.insert(e.id)
             out.append(Pick(entry: startable(e), part: parts[e.id] ?? "", recent: recent.firstIndex(of: e.id)))
         }

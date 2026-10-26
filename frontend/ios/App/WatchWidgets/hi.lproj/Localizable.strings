@@ -34,6 +34,9 @@
 "Swap exercise" = "व्यायाम बदलें";
 "Search…" = "खोजें…";
 "Freestyle" = "फ्रीस्टाइल";
+"Minutes" = "मिनट";
+"Speed (km/h)" = "गति (किमी/घं)";
+"Speed (mph)" = "गति (मील/घं)";
 "Last time: %@" = "पिछली बार: %@";
 "Recent" = "हाल के";
 "No workout running" = "कोई वर्कआउट नहीं चल रहा";
@@ -50,7 +53,6 @@
 "Workout saved" = "वर्कआउट सहेजा गया";
 "Ended on your iPhone" = "iPhone पर खत्म हुआ";
 "Tap a dot to do a skipped set." = "छूटा सेट करने के लिए एक बिंदु टैप करें।";
-"Log this one on your iPhone." = "इसे iPhone पर दर्ज करें।";
 "Saved on the watch, syncs later" = "वॉच पर सहेजा, बाद में सिंक होगा";
 "Skip this set?" = "यह सेट छोड़ें?";
 "Turn the Digital Crown to change it." = "बदलने के लिए Digital Crown घुमाएँ।";

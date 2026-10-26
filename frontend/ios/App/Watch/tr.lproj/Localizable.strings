@@ -34,6 +34,9 @@
 "Swap exercise" = "Egzersizi değiştir";
 "Search…" = "Ara…";
 "Freestyle" = "Serbest";
+"Minutes" = "Dakika";
+"Speed (km/h)" = "Hız (km/sa)";
+"Speed (mph)" = "Hız (mil/sa)";
 "Last time: %@" = "Geçen sefer: %@";
 "Recent" = "Son kullanılanlar";
 "No workout running" = "Devam eden antrenman yok";
@@ -50,7 +53,6 @@
 "Workout saved" = "Antrenman kaydedildi";
 "Ended on your iPhone" = "iPhone’da bitirildi";
 "Tap a dot to do a skipped set." = "Atlanan bir set için bir noktaya dokun.";
-"Log this one on your iPhone." = "Bunu iPhone’da kaydet.";
 "Saved on the watch, syncs later" = "Saatte kaydedildi, sonra eşitlenir";
 "Skip this set?" = "Bu set atlansın mı?";
 "Turn the Digital Crown to change it." = "Değiştirmek için Digital Crown’u çevir.";

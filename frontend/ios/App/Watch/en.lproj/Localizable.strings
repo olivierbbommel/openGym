@@ -34,6 +34,9 @@
 "Swap exercise" = "Swap exercise";
 "Search…" = "Search…";
 "Freestyle" = "Freestyle";
+"Minutes" = "Minutes";
+"Speed (km/h)" = "Speed (km/h)";
+"Speed (mph)" = "Speed (mph)";
 "Last time: %@" = "Last time: %@";
 "Recent" = "Recent";
 "No workout running" = "No workout running";
@@ -50,7 +53,6 @@
 "Workout saved" = "Workout saved";
 "Ended on your iPhone" = "Ended on your iPhone";
 "Tap a dot to do a skipped set." = "Tap a dot to do a skipped set.";
-"Log this one on your iPhone." = "Log this one on your iPhone.";
 "Saved on the watch, syncs later" = "Saved on the watch, syncs later";
 "Skip this set?" = "Skip this set?";
 "Turn the Digital Crown to change it." = "Turn the Digital Crown to change it.";

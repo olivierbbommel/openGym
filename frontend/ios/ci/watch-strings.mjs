@@ -55,6 +55,9 @@ const FROM_APP = {
   'Swap exercise': 'Swap exercise',
   'Search…': 'Search…',
   'Freestyle': 'Freestyle',
+  'Minutes': 'Minutes',
+  'Speed (km/h)': 'Speed (km/h)',
+  'Speed (mph)': 'Speed (mph)',
 }
 // Built from an app word: "Last time: %@".
 const COMPOSED = { 'Last time: %@': ['Last time', w => `${w}: %@`] }
@@ -131,9 +134,6 @@ const OWN = {
   },
   'Tap a dot to do a skipped set.': {
     de: 'Tippe auf einen Punkt, um einen übersprungenen Satz zu machen.', fr: 'Touche un point pour faire une série sautée.', es: 'Toca un punto para hacer una serie saltada.', it: 'Tocca un punto per fare una serie saltata.', 'pt-PT': 'Toca num ponto para fazer uma série saltada.', 'pt-BR': 'Toque num ponto para fazer uma série pulada.', pl: 'Stuknij kropkę, by zrobić pominiętą serię.', hu: 'Koppints egy pöttyre egy kihagyott sorozathoz.', tr: 'Atlanan bir set için bir noktaya dokun.', ru: 'Нажмите на точку, чтобы сделать пропущенный подход.', uk: 'Торкнись точки, щоб зробити пропущений підхід.', ar: 'اضغط نقطة لأداء مجموعة متخطاة.', hi: 'छूटा सेट करने के लिए एक बिंदु टैप करें।', bn: 'বাদ দেওয়া সেট করতে একটি বিন্দুতে ট্যাপ করুন।', th: 'แตะจุดเพื่อทำเซ็ตที่ข้ามไป', ko: '건너뛴 세트를 하려면 점을 탭하세요.', 'zh-Hans': '轻点圆点来做跳过的组。', 'zh-Hant': '輕點圓點來做跳過的組。',
-  },
-  'Log this one on your iPhone.': {
-    de: 'Das hier trägst du am iPhone ein.', fr: 'Celui-ci se note sur ton iPhone.', es: 'Este se registra en tu iPhone.', it: 'Questo si registra sull’iPhone.', 'pt-PT': 'Este regista-se no iPhone.', 'pt-BR': 'Este você registra no iPhone.', pl: 'To zapisz na iPhonie.', hu: 'Ezt az iPhone-on rögzítsd.', tr: 'Bunu iPhone’da kaydet.', ru: 'Это записывается на iPhone.', uk: 'Це записуй на iPhone.', ar: 'سجّل هذا على iPhone.', hi: 'इसे iPhone पर दर्ज करें।', bn: 'এটা iPhone-এ লিখুন।', th: 'อันนี้บันทึกบน iPhone', ko: '이건 iPhone에서 기록하세요.', 'zh-Hans': '这个请在 iPhone 上记录。', 'zh-Hant': '這個請在 iPhone 上記錄。',
   },
   'Saved on the watch, syncs later': {
     de: 'Auf der Watch gespeichert, synct später', fr: 'Gardé sur la montre, synchro plus tard', es: 'Guardado en el reloj, se sincroniza luego', it: 'Salvato sull’orologio, si sincronizza dopo', 'pt-PT': 'Guardado no relógio, sincroniza depois', 'pt-BR': 'Salvo no relógio, sincroniza depois', pl: 'Zapisano na zegarku, zsynchronizuje się później', hu: 'Az órán mentve, később szinkronizál', tr: 'Saatte kaydedildi, sonra eşitlenir', ru: 'Сохранено на часах, синхронизируется позже', uk: 'Збережено на годиннику, синхронізується пізніше', ar: 'حُفظ على الساعة، تتم المزامنة لاحقًا', hi: 'वॉच पर सहेजा, बाद में सिंक होगा', bn: 'ঘড়িতে সেভ হয়েছে, পরে সিঙ্ক হবে', th: 'บันทึกบนนาฬิกาแล้ว จะซิงค์ทีหลัง', ko: '워치에 저장됨, 나중에 동기화돼요', 'zh-Hans': '已存在手表上，稍后同步', 'zh-Hant': '已存在手錶上，稍後同步',
