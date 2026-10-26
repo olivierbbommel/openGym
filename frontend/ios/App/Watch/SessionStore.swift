@@ -182,8 +182,11 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         return workout == nil ? nil : workoutSeenAt
     }
 
-    /// Events wait on the watch for a phone out of reach: "Saved on the watch, syncs later".
-    var offline: Bool { queued > 0 && !reachable }
+    /// Events wait on the watch for a phone out of reach: "Saved on the watch, syncs later". Not
+    /// once the watch has written them to the server itself (ServerSync): they are synced then.
+    var offline: Bool { queued > 0 && !reachable && !onServer }
+    /// Every event still waiting for the phone is on the server already.
+    @Published private(set) var onServer = false
 
     func isSkipped(_ exId: String, _ si: Int) -> Bool { SessionCore.isSkipped(state, exId, si) }
 
@@ -265,6 +268,11 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     func apply(json: String) {
         guard let data = json.data(using: .utf8),
               let snap = try? JSONDecoder().decode(Snapshot.self, from: data) else { return }
+        // The phone's server and token, for the events the watch writes there itself: into the
+        // Keychain, not into the saved session. None in local mode (or Apple Watch off): forgotten.
+        if !isDemo, let raw = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
+            ServerSync.remember(ServerInbox.Server(raw["server"]))
+        }
         DispatchQueue.main.async {
             let before = self.state
             let next = SessionCore.applySnapshot(before, snap)
@@ -717,6 +725,11 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     }
 
     private func send(event: [String: Any]) {
+        // Its place in the queue, for whoever applies it from the server's copy (in that order).
+        var event = event
+        let seq = UserDefaults.standard.integer(forKey: SessionStore.seqKey) + 1
+        UserDefaults.standard.set(seq, forKey: SessionStore.seqKey)
+        event["seq"] = seq
         guard !isDemo, WCSession.isSupported(),
               let data = try? JSONSerialization.data(withJSONObject: event),
               let json = String(data: data, encoding: .utf8) else { return }
@@ -726,6 +739,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     /// Events made before the session was up (a tap right after launch) wait here, saved, and go out
     /// once it is: transferUserInfo before activation would lose them.
     private static let outboxKey = "outbox"
+    private static let seqKey = "eventSeq"
     private var outbox: [String] {
         get { UserDefaults.standard.stringArray(forKey: SessionStore.outboxKey) ?? [] }
         set { UserDefaults.standard.set(newValue, forKey: SessionStore.outboxKey) }
@@ -758,6 +772,37 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         DispatchQueue.main.async {
             if self.reachable != r { self.reachable = r }
             if self.queued != q { self.queued = q }
+            self.toServerLater()
+        }
+    }
+
+    /* ---------- the phone at home: the events to the server too ---------- */
+
+    private var serverTimer: Timer?
+
+    /// What waits for the phone (the system's queue, then what waits for activation), oldest first.
+    private var waiting: [String] {
+        let sent = WCSession.isSupported() ? WCSession.default.outstandingUserInfoTransfers.compactMap { $0.userInfo["event"] as? String } : []
+        return sent + outbox
+    }
+
+    /// With the phone out of reach and events waiting: written to the server a little later (a few
+    /// taps go together), and tried again every two minutes while that lasts (no network yet).
+    private func toServerLater(after delay: TimeInterval = 3) {
+        guard !isDemo else { return }
+        let pending = waiting
+        let has = !pending.isEmpty && ServerSync.shared.has(pending)
+        if onServer != has { onServer = has }
+        guard !reachable, !pending.isEmpty, !has else { serverTimer?.invalidate(); serverTimer = nil; return }
+        guard serverTimer == nil else { return }
+        serverTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            self.serverTimer = nil
+            ServerSync.shared.upload(self.waiting) { ok in
+                DispatchQueue.main.async {
+                    if ok { self.toServerLater() } else { self.toServerLater(after: 120) }
+                }
+            }
         }
     }
 

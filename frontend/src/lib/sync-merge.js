@@ -78,6 +78,7 @@ import { bestWeightForEntry } from './history.js'
 import { convertStateUnit, convertBodyWeight } from './units.js'
 import { sanitizeAccent } from './accent.js'
 import { readDayNote as readNote } from './day-notes.js'
+import { mergeInbox, putInbox } from './watch-inbox.js'
 
 const clone = o => JSON.parse(JSON.stringify(o))
 const list = v => (Array.isArray(v) ? v : [])
@@ -869,6 +870,10 @@ export function mergeStates(a0, b0, { prefer } = {}) {
     if (Object.keys(undone).length) out.undone = undone; else delete out.undone
   }
   if (deleted) out.deleted = deleted; else delete out.deleted
+  // What the watch wrote into the profile with the phone at home (lib/watch-inbox.js): every
+  // event from either copy, less what either applied. The newer copy alone would drop the
+  // watch's upload whenever the phone pushed over it.
+  putInbox(out, mergeInbox(n, o))
   out._ts = Math.max(a._ts || 0, b._ts || 0)
   if (resetAt) out.resetAt = resetAt
   if (resetIds) out.resetIds = resetIds

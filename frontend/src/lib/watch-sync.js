@@ -30,6 +30,8 @@ import { sanitizeHr } from './heart-rate.js'
 import { mediaOf, MEDIA_MIMES } from './media-refs.js'
 import { speedUnitOf } from './speed.js'
 import { readWatchPrefs, settingsForWatch, writeWatchStatus, onWatchPrefs } from './watch-settings.js'
+import { inboxPending, markInboxDone } from './watch-inbox.js'
+import { remoteAuth } from './api.js'
 
 export const SNAPSHOT_VERSION = 1
 const APPLIED_KEY = 'gym_watch_applied'
@@ -461,20 +463,23 @@ function entryIndexOf (A, ev) {
  * not open opens it (appHandlers.openWorkout), and the queue drains once it is there. Of two
  * changes of the same set, the later one (`at`) wins.
  */
-export function applyEvents (events, getState) {
+export function applyEvents (events, getState, { skip = null } = {}) {
   if (!Array.isArray(events)) return []
   const applied = readApplied()
   const done = []
   for (const ev of events) {
     if (!ev || typeof ev.id !== 'string') continue
-    if (applied.includes(ev.id)) { done.push(ev.id); continue }
+    // Applied here before, or on another device from the profile's inbox (lib/watch-inbox.js).
+    if (applied.includes(ev.id) || skip?.has(ev.id)) { done.push(ev.id); continue }
     const S = getState()?.S
     const A = S?.active
     const ours = A && Array.isArray(A.entries) && (!ev.wid || ev.wid === A.id)
     // A workout finished on the phone while the watch was away: its later ticks still count.
     const saved = !ours && ev.wid && Array.isArray(S?.workouts) ? S.workouts.find(w => w && w.id === ev.wid) : null
     if (ev.type === 'start') {
-      if (!A) {
+      // A workout already saved under the watch's id was started (and finished) on another device,
+      // from the profile's inbox: starting it again here would log it twice.
+      if (!A && !saved) {
         if (!appHandlers) break
         // Started at the wrist: the watch app is open already, nothing to open there (startWatchSync).
         if (ev.wid) startedOnWatch.add(ev.wid)
@@ -627,11 +632,22 @@ export function drainWatchEvents () {
   draining = (async () => {
     try {
       const p = await watchPlugin()
-      if (!p || !getStateRef || !storeReady()) return []
-      const { events = [] } = (await p.WatchBridge.drain()) || {}
-      const done = applyEvents(events, getStateRef)
+      if (!getStateRef || !storeReady()) return []
+      const { events = [] } = (p && (await p.WatchBridge.drain())) || {}
+      // The same events by way of the server (the phone was at home, lib/watch-inbox.js): those the
+      // native queue does not have, after it. What another device applied counts as done.
+      const S = getStateRef()?.S
+      const own = new Set(events.map(e => e?.id))
+      const inbox = inboxPending(S, readApplied()).filter(e => !own.has(e.id))
+      const skip = new Set(Array.isArray(S?.watchInboxDone) ? S.watchInboxDone : [])
+      const done = applyEvents([...events, ...inbox], getStateRef, { skip })
+      // Out of the profile's inbox: the server's copy, and every other device's, lose them too.
+      const listed = new Set((S?.watchInbox || []).map(e => e?.id))
+      const fromInbox = done.filter(id => listed.has(id))
+      if (fromInbox.length) getStateRef()?.update?.(s => { markInboxDone(s, fromInbox) })
       if (done.length) await getStateRef()?.saveNow?.()
-      if (done.length) await p.WatchBridge.ack({ ids: done })
+      const native = done.filter(id => own.has(id))
+      if (p && native.length) await p.WatchBridge.ack({ ids: native })
       return done
     } catch { return [] } finally { draining = null }
   })()
@@ -783,6 +799,10 @@ export async function startWatchSync ({ useStore, useUI }) {
         ? buildSnapshot(S, { timer: useUI.getState().timer, ready: readyFor(S) })
         : { v: SNAPSHOT_VERSION, unit: S.unit === 'lb' ? 'lb' : 'kg', active: null, ready: null }
       snap.settings = { ...settingsForWatch(prefs, healthOn), ...watchExtras(S) }
+      // The paired server and the phone's token for it: the watch writes its events there itself
+      // when the phone is out of reach (lib/watch-inbox.js). Nothing in local mode.
+      const server = prefs.enabled ? remoteAuth() : null
+      if (server) snap.server = server
       // The watch's own changes the phone has applied: the watch stops laying them over the snapshot.
       if (prefs.enabled) snap.applied = recentlyApplied()
       // What the watch can add or swap in, the phone at home (built with the ready routines).
@@ -823,6 +843,8 @@ export async function startWatchSync ({ useStore, useUI }) {
     // Boot done: what the watch sent meanwhile is applied now, and the watch hears the real state.
     if (s.ready && !prev.ready) { drainWatchEvents(); schedule() }
     if (s.S === prev.S) return
+    // The server's copy brought events the watch wrote there: applied now, as the queue's are.
+    if (s.S?.watchInbox !== prev.S?.watchInbox && s.S?.watchInbox?.length) drainWatchEvents()
     schedule()
     // A workout started on the phone: the watch app opens with it (HealthKit's startWatchApp).
     if (linked && shouldOpenOnWatch(prev.S?.active, s.S?.active)) Promise.resolve().then(() => p.WatchBridge.openOnWatch()).catch(() => {})
