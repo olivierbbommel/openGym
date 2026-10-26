@@ -44,6 +44,7 @@ done
 # The name the watch face and the widget gallery show (the complications say it in words).
 sed -i '' -e 's/Text(verbatim: "openGym")/Text(verbatim: "OliGym")/g' -e 's/configurationDisplayName("openGym")/configurationDisplayName("OliGym")/g' \
   -e 's/description("Opens openGym\.")/description("Opens OliGym.")/g' "$IOS/App/WatchWidgets/OpenGymWidgets.swift"
+sed -i '' 's/mode: "idle", title: "openGym"/mode: "idle", title: "OliGym"/' "$IOS/App/Watch/WidgetState.swift"
 
 # Edit the line after the key in place (plutil -replace would re-sort the whole file).
 for p in App Watch OpenGymWidgets WatchWidgets; do

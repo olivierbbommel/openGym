@@ -19,6 +19,7 @@ struct Entry: TimelineEntry {
         case "rest": return TimelineEntryRelevance(score: 100)
         case "set": return TimelineEntryRelevance(score: 60)
         case "today": return TimelineEntryRelevance(score: 30)
+        case "next": return TimelineEntryRelevance(score: 10)
         default: return TimelineEntryRelevance(score: 0)
         }
     }
@@ -88,6 +89,12 @@ struct WidgetView: View {
                     AccessoryWidgetBackground()
                     Image(systemName: "play.fill").font(.title3)
                 }
+            } else if s.mode == "next" {
+                // A rest day: the day of the next planned workout.
+                ZStack {
+                    AccessoryWidgetBackground()
+                    Text(verbatim: s.detail).font(.system(.caption, design: .rounded).weight(.semibold)).minimumScaleFactor(0.6).padding(4)
+                }
             } else if s.total > 0 {
                 ProgressRing(done: s.done, total: s.total)
             } else {
@@ -101,6 +108,8 @@ struct WidgetView: View {
                 Text(timerInterval: entry.date...end, countsDown: true)
             } else if s.mode == "today" {
                 Text("Start workout")
+            } else if s.mode == "next" {
+                Text(verbatim: "\(s.detail) · \(s.title)")
             } else {
                 Text(verbatim: s.detail.isEmpty ? s.title : "\(s.setLabel) · \(s.detail)")
             }
@@ -110,7 +119,7 @@ struct WidgetView: View {
                     Text(verbatim: "\(s.done)")
                         .font(.title3.monospacedDigit())
                 } else {
-                    Image(systemName: s.mode == "today" ? "play.fill" : "dumbbell.fill").font(.title3)
+                    Image(systemName: s.mode == "today" ? "play.fill" : s.mode == "next" ? "calendar" : "dumbbell.fill").font(.title3)
                 }
             }
             .widgetLabel {
@@ -118,6 +127,8 @@ struct WidgetView: View {
                     Text(timerInterval: entry.date...end, countsDown: true)
                 } else if s.total > 0 && s.mode != "today" {
                     Gauge(value: Double(s.done), in: 0...Double(max(s.total, 1))) { Text(verbatim: "") }
+                } else if s.mode == "next" {
+                    Text(verbatim: "\(s.detail) · \(s.title)")
                 } else {
                     Text(verbatim: s.title)
                 }
@@ -131,6 +142,9 @@ struct WidgetView: View {
                     Text(verbatim: s.title).font(.caption2).lineLimit(1)
                 } else if s.mode == "today" {
                     Label("Start workout", systemImage: "play.fill").font(.caption2).foregroundStyle(.secondary)
+                    Text(verbatim: s.title).font(.system(.headline, design: .rounded)).lineLimit(2)
+                } else if s.mode == "next" {
+                    Label { Text(verbatim: s.detail) } icon: { Image(systemName: "calendar") }.font(.caption2).foregroundStyle(.secondary)
                     Text(verbatim: s.title).font(.system(.headline, design: .rounded)).lineLimit(2)
                 } else if s.mode == "set" {
                     Text(verbatim: s.title).font(.system(.headline, design: .rounded)).lineLimit(1)

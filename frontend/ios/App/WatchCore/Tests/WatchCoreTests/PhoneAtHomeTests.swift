@@ -277,5 +277,50 @@ final class PhoneAtHomeTests: XCTestCase {
         XCTAssertTrue(r.startQueued)
         XCTAssertFalse(SessionCore.queued(for: "w0", in: q).startQueued)
     }
+
+    /* ---------- effort, order, rest ---------- */
+
+    func testATickCarriesItsEffortAndItHoldsOverAnOlderSnapshot() {
+        var s = running([row(60, 8), row(60, 8)])
+        let (t, ev) = SessionCore.tick(s, entry: 0, set: 0, w: 60, r: 8, rir: 2, at: 10, id: "t1")
+        XCTAssertEqual(ev?["rir"] as? Double, 2)
+        XCTAssertNil(ev?["rpe"])
+        s = SessionCore.applySnapshot(t, snap(workout("p1", [row(60, 8), row(60, 8)])))
+        XCTAssertEqual(s.workout?.entries[0].sets[0].rir, 2)
+        XCTAssertEqual(Effort.range("rpe"), 6...10)
+        XCTAssertEqual(Effort.label("rir"), "RIR")
+    }
+
+    func testAMoveTakesTheWholeSupersetAsThePhonesButtonsDoAndTheExerciseStaysOnScreen() {
+        var s0 = SessionState()
+        s0.workout = ActiveWorkout(id: "p1", name: "W", unit: "kg", cur: 0, restSec: 90, rest: nil,
+                                   entries: [entry("a", [row(1, 1)]), entry("b", [row(1, 1)], group: "g"), entry("c", [row(1, 1)], group: "g"), entry("d", [row(1, 1)])])
+        XCTAssertEqual(SessionCore.units(s0.workout!.entries), [[0], [1, 2], [3]])
+        let (s, ev) = SessionCore.moveExercise(s0, entry: 3, by: -1, at: 1, id: "m1")
+        XCTAssertEqual(s.workout?.entries.map(\.id), ["a", "d", "b", "c"])
+        XCTAssertEqual(s.entryIndex, 1)
+        XCTAssertEqual(ev?["direction"] as? Int, -1)
+        let (s2, _) = SessionCore.moveExercise(s0, entry: 2, by: -1, at: 1, id: "m2")
+        XCTAssertEqual(s2.workout?.entries.map(\.id), ["b", "c", "a", "d"], "a superset member moves its superset")
+        XCTAssertEqual(s2.entryIndex, 1)
+        XCTAssertNil(SessionCore.moveExercise(s0, entry: 0, by: -1, at: 1, id: "m3").1, "nothing above the first")
+    }
+
+    func testAMoveAndARestTimeStayOverOlderSnapshotsUntilThePhoneHasThem() {
+        var s = running([row(60, 8)])
+        s = SessionCore.moveExercise(s, entry: 1, by: -1, at: 1, id: "m1").0
+        s = SessionCore.setRest(s, seconds: 123, at: 2, id: "r1").0
+        XCTAssertEqual(s.restSec, 125, "on the 5 s grid")
+        s = SessionCore.applySnapshot(s, snap(workout("p1", [row(60, 8)])))
+        XCTAssertEqual(s.workout?.entries.map(\.id), ["0426", "0025"])
+        XCTAssertEqual(s.workout?.restSec, 125)
+        XCTAssertEqual(s.restSec, 125)
+        var phone = workout("p1", [row(60, 8)])
+        phone.entries.reverse()
+        phone.restSec = 125
+        s = SessionCore.applySnapshot(s, snap(phone, applied: ["m1", "r1"]))
+        XCTAssertEqual(s.workout?.entries.map(\.id), ["0426", "0025"])
+        XCTAssertNil(s.edits)
+    }
 }
 

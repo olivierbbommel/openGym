@@ -19,13 +19,13 @@ import { EXIDX, gifSrc, figureOf, isAssisted } from './exercises.js'
 import { packId, packDrawingId } from './anim-quality.js'
 import { getState as animPacks } from './anim-packs.js'
 import { t, exerciseNameFor, getLang, baseLang, onLangChange } from './i18n.js'
-import { modeOf, setLabel, lastEntryFor, effectiveRoutineIds, isBw, isPerSide, freestyleConfig, defaultConfig } from './history.js'
+import { modeOf, setLabel, lastEntryFor, effectiveRoutineIds, isBw, isPerSide, freestyleConfig, defaultConfig, effortOf, capEffort } from './history.js'
 import { isWarmupRow, isSideSet, syncSideAggregate } from './workout-model.js'
 import { bestSetFor } from './exercise-history.js'
 import { weightIncrement } from './progression.js'
 import { sessionHistory } from './backfill.js'
 import { buildCombinedEntries, deriveSessionName } from './session-merge.js'
-import { todayISO } from './format.js'
+import { todayISO, isoOf } from './format.js'
 import { sanitizeHr } from './heart-rate.js'
 import { mediaOf, MEDIA_MIMES } from './media-refs.js'
 import { speedUnitOf } from './speed.js'
@@ -52,6 +52,9 @@ const extraOf = ev => ({
   // a cardio set's minutes and speed (km/h, as the phone keeps it)
   ...(num(ev.min) != null ? { min: num(ev.min) } : {}),
   ...(num(ev.speed) != null ? { speed: num(ev.speed) } : {}),
+  // the effort logged with it, on the profile's scale (lib/history.js EFFORT)
+  ...(num(ev.rir) != null ? { rir: capEffort('rir', num(ev.rir)) } : {}),
+  ...(num(ev.rpe) != null ? { rpe: capEffort('rpe', num(ev.rpe)) } : {}),
 })
 
 /* ---------- the snapshot ---------- */
@@ -87,6 +90,9 @@ function watchSet (s) {
     ...(num(s.min) != null ? { min: num(s.min) } : {}),
     ...(num(s.speed) != null ? { speed: num(s.speed) } : {}),
     ...(num(s.incline) != null ? { incline: num(s.incline) } : {}),
+    // the effort already logged (or planned) on it
+    ...(num(s.rir) != null ? { rir: num(s.rir) } : {}),
+    ...(num(s.rpe) != null ? { rpe: num(s.rpe) } : {}),
   }
 }
 
@@ -138,7 +144,28 @@ export function buildReady (S, today = todayISO()) {
   try { todayIds = effectiveRoutineIds({ ...S, routines: S.routines || [], week: S.week || {}, dayPlan: S.dayPlan || {} }, today, today) || [] } catch { todayIds = [] }
   const planned = todayIds.length ? session(todayIds) : null
   const others = (S.routines || []).filter(r => r && !todayIds.includes(r.id)).slice(0, READY_MAX).map(r => session([r.id])).filter(Boolean)
-  return { today: planned, others }
+  return { today: planned, others, ...(planned ? {} : { next: nextPlanned(S, today) }) }
+}
+
+/**
+ * On a day with nothing planned: the next day that has a routine, within a week, as the watch's
+ * complications show it ("Push A", "Tue"), or nothing.
+ */
+export function nextPlanned (S, today = todayISO()) {
+  const plan = { ...S, routines: S.routines || [], week: S.week || {}, dayPlan: S.dayPlan || {} }
+  for (let d = 1; d <= 7; d++) {
+    const day = new Date(today + 'T12:00:00')
+    day.setDate(day.getDate() + d)
+    const iso = isoOf(day)
+    let ids = []
+    try { ids = effectiveRoutineIds(plan, iso, today) || [] } catch { ids = [] }
+    const names = ids.map(id => plan.routines.find(r => r && r.id === id)?.name).filter(Boolean)
+    if (!names.length) continue
+    let label = iso
+    try { label = new Intl.DateTimeFormat(getLang() || 'en', { weekday: 'short' }).format(day) } catch { /* the date then */ }
+    return { name: deriveSessionName(names) || names[0], day: label }
+  }
+  return undefined
 }
 
 // The body parts as the app names them (views/CoachChat.jsx), for the watch's exercise list.
@@ -416,6 +443,8 @@ function entryIndexOf (A, ev) {
  *   setDone { wid, exId, entryIdx, setIdx, w, r, at }   the workout screen's own tick
  *   finish  { wid, at }              the workout screen's own Finish and save
  *   discard { wid, at }              the app's own Discard: the session goes, nothing saved
+ *   moveExercise { wid, exId, entryIdx, direction }  the workout screen's own move (-1 up, 1 down)
+ *   setRest { sec }                  the phone's rest timer setting, as its workout ⋯ sets it
  *   setHr   { wid, exId, entryIdx, setIdx, hr?, restHr? }   heart rate on a set (lib/heart-rate.js)
  *   addSet    { wid, exId, entryIdx, rows }            the workout screen's own Add set
  *   removeSet { wid, exId, entryIdx, setIdx, rows }    its own remove, a set not done only
@@ -468,6 +497,20 @@ export function applyEvents (events, getState) {
       const idx = entryIndexOf(A, ev)
       const set = idx >= 0 ? A.entries[idx].sets?.[ev.setIdx] : null
       if (set) handlers.setDone(idx, ev.setIdx, { w: num(ev.w), r: num(ev.r), at: num(ev.at), hr: sanitizeHr(ev.hr), ...extraOf(ev) })
+    } else if (ev.type === 'setRest') {
+      // The rest timer changed at the wrist: the phone's own setting (Settings, the workout's ⋯).
+      if (num(ev.sec) != null) {
+        if (!appHandlers?.setRest) break
+        appHandlers.setRest(Math.max(0, Math.min(600, num(ev.sec))))
+      }
+    } else if (ev.type === 'moveExercise' && ours) {
+      // Moved up or down at the wrist: the workout screen's own move, the whole superset with it.
+      if (!handlers) {
+        if (appHandlers?.openWorkout) appHandlers.openWorkout()
+        break
+      }
+      const idx = entryIndexOf(A, ev)
+      if (idx >= 0 && (ev.direction === 1 || ev.direction === -1) && handlers.moveExercise) handlers.moveExercise(idx, ev.direction)
     } else if (['addSet', 'removeSet', 'addExercise', 'swapExercise'].includes(ev.type) && saved) {
       // Changed at the wrist after the phone saved it: the saved copy follows (editSavedWorkout).
       if (!appHandlers?.patchWorkout) break
@@ -691,6 +734,8 @@ export function watchExtras (S) {
     weighIn: S?.weighIn !== false,
     // cardio speeds are kept in km/h; the watch shows them in the profile's unit
     speedUnit: speedUnitOf(S),
+    // the effort a set is logged with ('rir', 'rpe' or 'none'), as the phone's set rows show it
+    effort: effortOf(S),
     ...(bw && num(bw.w) ? { lastBw: num(bw.w) } : {}),
   }
 }

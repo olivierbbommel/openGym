@@ -41,6 +41,11 @@
 "Discard workout?" = "تجاهل التمرين؟";
 "Discard" = "تجاهل";
 "How to do it" = "طريقة الأداء";
+"Effort" = "الجهد";
+"None" = "بدون";
+"Rest timer" = "مؤقت الراحة";
+"Move up" = "تحريك لأعلى";
+"Move down" = "تحريك لأسفل";
 "The sets you logged in this session will be lost." = "ستُفقد المجموعات التي سجلتها في هذه الجلسة.";
 "Last time: %@" = "المرة السابقة: %@";
 "Recent" = "الأخيرة";

@@ -41,6 +41,11 @@
 "Discard workout?" = "Antrenman iptal edilsin mi?";
 "Discard" = "Vazgeç";
 "How to do it" = "Nasıl yapılır";
+"Effort" = "Zorluk";
+"None" = "Yok";
+"Rest timer" = "Dinlenme sayacı";
+"Move up" = "Yukarı taşı";
+"Move down" = "Aşağı taşı";
 "The sets you logged in this session will be lost." = "Bu oturumda kaydettiğin setler kaybolacak.";
 "Last time: %@" = "Geçen sefer: %@";
 "Recent" = "Son kullanılanlar";

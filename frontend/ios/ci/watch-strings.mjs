@@ -62,6 +62,11 @@ const FROM_APP = {
   'Discard workout?': 'Discard workout?',
   'Discard': 'Discard',
   'How to do it': 'How to do it',
+  'Effort': 'Effort',
+  'None': 'None',
+  'Rest timer': 'Rest timer',
+  'Move up': 'Move up',
+  'Move down': 'Move down',
   'The sets you logged in this session will be lost.': 'The sets you logged in this session will be lost.',
 }
 // Built from an app word: "Last time: %@".

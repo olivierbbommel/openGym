@@ -41,6 +41,11 @@
 "Discard workout?" = "¿Descartar entrenamiento?";
 "Discard" = "Descartar";
 "How to do it" = "Cómo se hace";
+"Effort" = "Esfuerzo";
+"None" = "Ninguno";
+"Rest timer" = "Temporizador de descanso";
+"Move up" = "Subir";
+"Move down" = "Bajar";
 "The sets you logged in this session will be lost." = "Las series registradas en esta sesión se perderán.";
 "Last time: %@" = "La última vez: %@";
 "Recent" = "Recientes";

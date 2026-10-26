@@ -81,6 +81,12 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     @Published var speed: Double = 0 { didSet { if speed != oldValue { ackRestOver() } } }
     /// The unit cardio speeds are shown in ("kmh" or "mph"); they are kept in km/h.
     var speedUnit: String? { state.settings.speedUnit }
+    /// The effort scale the profile logs ("rir" or "rpe"), or nil for none.
+    var effortKind: String? { ["rir", "rpe"].contains(state.settings.effort ?? "") ? state.settings.effort : nil }
+    /// The effort of the set up next, nil until set (empty is not 0, as on the phone).
+    @Published var effort: Double?
+    /// The rest between sets from now on, in seconds.
+    var restSeconds: Double { workout?.restSec ?? state.restSec }
     /// A hold running: when it ends, and when it started.
     @Published private(set) var holdEndsAt: Date?
     @Published private(set) var holdStartedAt: Date?
@@ -231,6 +237,10 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             let total = today.entries.flatMap { $0.sets }.filter { !$0.warmup }.count
             return WidgetState(mode: "today", title: today.name, detail: "", restEndsAt: nil, done: 0, total: total)
         }
+        // A rest day: the next planned routine and its day.
+        if let next = ready?.next {
+            return WidgetState(mode: "next", title: next.name, detail: next.day, restEndsAt: nil)
+        }
         return .idle
     }
 
@@ -302,6 +312,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         }
         seconds = s?.sec ?? 30
         minutes = s?.min ?? 20
+        effort = effortKind == "rpe" ? s?.rpe : effortKind == "rir" ? s?.rir : nil
         speed = (Speed.shown(s?.speed ?? 0, unit: speedUnit) * 10).rounded() / 10
     }
 
@@ -333,7 +344,9 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             tw = weight
             tr = reps
         }
+        let rated = e.isCardio ? nil : effort
         let (next, event) = SessionCore.tick(state, entry: ei, set: si, side: side, w: tw, r: tr, sec: tsec, min: tmin, speed: tspeed,
+                                             rir: effortKind == "rir" ? rated : nil, rpe: effortKind == "rpe" ? rated : nil,
                                              at: now.timeIntervalSince1970 * 1000, id: UUID().uuidString, hr: hr)
         // Sent first, saved second: killed in between, the phone still has the tick (and the next
         // snapshot brings it back here); the other way round the tick would be lost on the phone.
@@ -526,6 +539,24 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         picked[ei] = nil
         if ei == entryIndex { loadTargets() }
         WKInterfaceDevice.current().play(.click)
+    }
+
+    /// Exercise `ei` (with its superset) moved up (-1) or down (1), for the phone too.
+    func moveExercise(_ ei: Int, by d: Int) {
+        let (next, event) = SessionCore.moveExercise(state, entry: ei, by: d, at: Date().timeIntervalSince1970 * 1000, id: UUID().uuidString)
+        guard let ev = event else { return }
+        send(event: ev)
+        state = next
+        picked = [:]
+        WKInterfaceDevice.current().play(.click)
+    }
+
+    /// The rest between sets from now on (the phone's rest timer), for the phone too.
+    func setRest(_ seconds: Double) {
+        guard abs(seconds - restSeconds) >= 1 else { return }
+        let (next, event) = SessionCore.setRest(state, seconds: seconds, at: Date().timeIntervalSince1970 * 1000, id: UUID().uuidString)
+        state = next
+        if let ev = event { send(event: ev) }
     }
 
     /// What can be added or swapped in here, the phone at home or not.
@@ -885,6 +916,9 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         DispatchQueue.main.async {
             switch screen {
             case "set", "weight", "rest", "offline", "edit-weight", "edit-reps", "actions", "howto": self.picked[0] = 2
+            case "effort", "edit-effort":
+                self.picked[0] = 2
+                self.state.settings.effort = "rir"
             case "howto-none": self.state.entryIndex = 1
             case "add-set":
                 self.picked[0] = 2
@@ -904,6 +938,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             }
             // CI: the watch in another language than its own (the app's, as the phone sends it).
             if let lang = SessionStore.argument("-OpenGymWatchLang") { self.state.settings.lang = lang }
+            if screen == "next" { self.state.ready = Ready(today: nil, others: [], next: NextSession(name: "Push A", day: "Wed")) }
             if let show = SessionStore.argument("-OpenGymWatchShow") {
                 // "all": every optional thing on, for a look at the fullest screen.
                 if show == "all" { self.state.settings.show = WatchShow(clip: true, hr: true, last: true, elapsed: true, kcal: true, next: true, rest: "ring") }
@@ -911,6 +946,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
                 if show == "noclip" { self.state.settings.show = WatchShow(clip: false) }
             }
             self.loadTargets()
+            if screen == "effort" || screen == "edit-effort" { self.effort = 2 }
             if screen == "rest" { self.startRest(until: Date().addingTimeInterval(83), notify: false) }
             if screen == "hold" { self.startHold() }
             if screen == "offline" { self.reachable = false; self.queued = 3 }

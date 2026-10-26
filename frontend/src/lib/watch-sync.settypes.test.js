@@ -162,8 +162,9 @@ describe('the weigh-in from the watch', () => {
   it('the watch is told the app\'s language, whether to ask, and the last weight', async () => {
     const { watchExtras } = await import('./watch-sync.js')
     expect(watchExtras({ weighIn: false, bodyweight: [{ d: '2026-10-01', w: 80 }, { d: '2026-10-10', w: 79.5 }] }))
-      .toEqual({ lang: 'en', weighIn: false, lastBw: 79.5, speedUnit: 'kmh' })
-    expect(watchExtras({})).toEqual({ lang: 'en', weighIn: true, speedUnit: 'kmh' })
+      .toEqual({ lang: 'en', weighIn: false, lastBw: 79.5, speedUnit: 'kmh', effort: 'none' })
+    expect(watchExtras({})).toEqual({ lang: 'en', weighIn: true, speedUnit: 'kmh', effort: 'none' })
+    expect(watchExtras({ effort: 'rir' }).effort).toBe('rir')
     // a profile in pounds reads speeds in mph until it picks a unit (lib/speed.js)
     expect(watchExtras({ unit: 'lb' }).speedUnit).toBe('mph')
   })

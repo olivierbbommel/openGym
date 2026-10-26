@@ -361,6 +361,8 @@ export default function App() {
       }),
       // Ticks from the watch are the workout screen's to apply: it opens, and drains the queue.
       openWorkout: () => { if (!String(window.location.hash || '').startsWith('#/workout')) navToWorkout() },
+      // The rest timer set at the wrist: the same setting the workout's ⋯ and Settings change.
+      setRest: sec => useStore.getState().update(s => { s.restSec = sec }),
       // Thrown away at the wrist: the phone's own Discard (nothing saved), the timers with it.
       discard: wid => {
         const A = useStore.getState().S.active

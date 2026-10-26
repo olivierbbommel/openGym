@@ -47,6 +47,14 @@ struct Pick: Equatable, Identifiable {
 struct Ready: Codable, Equatable {
     var today: ReadySession?
     var others: [ReadySession]
+    /// On a day with nothing planned: the next planned routine and its day, for the complications.
+    var next: NextSession?
+}
+
+struct NextSession: Codable, Equatable {
+    var name: String
+    /// Its day as the phone says it, in the app's language ("Tue", "Tomorrow").
+    var day: String
 }
 
 struct ReadySession: Codable, Equatable {
@@ -134,6 +142,9 @@ struct SetRow: Codable, Equatable {
     var min: Double?
     var speed: Double?
     var incline: Double?
+    /// The effort logged with it, on the scale the profile uses (reps in reserve, or RPE).
+    var rir: Double?
+    var rpe: Double?
 
     /// The side up next on a per-side set ("L", then "R"), or nil.
     var sideUp: String? {
@@ -162,6 +173,15 @@ struct WatchSettings: Codable, Equatable {
     var show: WatchShow?
     /// The unit cardio speeds are shown in: "kmh" (default) or "mph". They are kept in km/h.
     var speedUnit: String?
+    /// The effort a set is logged with: "rir", "rpe" or "none" (the phone's Settings).
+    var effort: String?
+}
+
+/// The effort scales, as the phone has them (frontend lib/history.js EFFORT).
+enum Effort {
+    static func range(_ kind: String) -> ClosedRange<Double> { kind == "rpe" ? 6...10 : 0...10 }
+    static let step = 0.5
+    static func label(_ kind: String) -> String { kind == "rpe" ? "RPE" : "RIR" }
 }
 
 /// What a workout screen shows. Each nil means its default.

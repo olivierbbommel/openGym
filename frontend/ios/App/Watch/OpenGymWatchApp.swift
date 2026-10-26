@@ -297,7 +297,7 @@ struct ExercisePager: View {
 
 /// What a tap on a number opens for editing.
 enum EditField: String, Identifiable {
-    case weight, reps, seconds, minutes, speed
+    case weight, reps, seconds, minutes, speed, effort, rest
     var id: String { rawValue }
 }
 
@@ -340,15 +340,30 @@ struct ExercisePage: View {
                     } else {
                         numbers(entry, row, unit: w.unit, current: current)
                     }
-                    if store.show.showLast, let last = entry.last, !last.isEmpty {
-                        Text("Last time: \(last)")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                            .padding(.top, 1)
-                            .dynamicTypeSize(...DynamicTypeSize.large)
+                    // Last time, and the effort of this set (the profile's scale) on the same line.
+                    HStack(spacing: 6) {
+                        if store.show.showLast, let last = entry.last, !last.isEmpty {
+                            Text("Last time: \(last)")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                        }
+                        if let kind = store.effortKind, !entry.isCardio, current {
+                            Button { editing = .effort } label: {
+                                Text(verbatim: "\(Effort.label(kind)) \(store.effort.map(formatNumber) ?? "–")")
+                                    .font(.system(size: 11, weight: .semibold, design: .rounded).monospacedDigit())
+                                    .foregroundStyle(store.effort == nil ? Color.secondary : Theme.accent)
+                                    .padding(.horizontal, 8)
+                                    .frame(minHeight: 22)
+                                    .background(Capsule().fill(Theme.dim))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(Text("Effort"))
+                        }
                     }
+                    .padding(.top, 1)
+                    .dynamicTypeSize(...DynamicTypeSize.large)
                     Spacer(minLength: 2)
                     primaryButton(entry, current: current)
                     Spacer(minLength: 3)
@@ -378,6 +393,7 @@ struct ExercisePage: View {
                 if current, SessionStore.demoScreen == "actions" { actions = true }
                 if current, SessionStore.demoScreen == "howto" || SessionStore.demoScreen == "howto-none" { howTo = true }
                 if current, SessionStore.demoScreen == "edit-speed" { editing = .speed }
+                if current, SessionStore.demoScreen == "edit-effort" { editing = .effort }
             }
             .sheet(item: $editing) { field in
                 ValueEditor(field: field, entry: entry, unit: w.unit)
@@ -538,6 +554,20 @@ struct ExerciseActions: View {
                         row("minus.circle", Text("Remove set")) { store.removeSet(si, in: index) }
                     }
                     NavigationLink { HowToView(entry: entry) } label: { label("play.rectangle", Text("How to do it")) }
+                    // The order, the whole superset at once (as the phone's buttons under an exercise).
+                    if SessionCore.moved(w.entries, at: index, by: -1) != nil {
+                        row("arrow.up", Text("Move up")) { store.moveExercise(index, by: -1) }
+                    }
+                    if SessionCore.moved(w.entries, at: index, by: 1) != nil {
+                        row("arrow.down", Text("Move down")) { store.moveExercise(index, by: 1) }
+                    }
+                    NavigationLink { ValueEditor(field: .rest, entry: entry, unit: w.unit) } label: {
+                        HStack {
+                            label("timer", Text("Rest timer"))
+                            Spacer(minLength: 2)
+                            Text(verbatim: "\(formatNumber(store.restSeconds)) s").font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
                     NavigationLink {
                         ExercisePicker(title: Text("Swap exercise"), exclude: entry.id) { store.swapExercise(index, to: $0); close() }
                     } label: { label("arrow.triangle.2.circlepath", Text("Swap exercise")) }
@@ -739,6 +769,8 @@ struct ValueEditor: View {
     let entry: Entry
     let unit: String
     @State private var value: Double = 0
+    /// The effort was cleared (None): nothing is saved over it on the way out.
+    @State private var cleared = false
     @FocusState private var focused: Bool
     @ScaledMetric(relativeTo: .largeTitle) private var size: CGFloat = 54
 
@@ -749,6 +781,8 @@ struct ValueEditor: View {
         case .seconds: return 5
         case .minutes: return 1
         case .speed: return store.speedUnit == "mph" ? 0.1 : 0.5
+        case .effort: return Effort.step
+        case .rest: return 15
         }
     }
     private var range: ClosedRange<Double> {
@@ -758,6 +792,8 @@ struct ValueEditor: View {
         case .seconds: return 5...3600
         case .minutes: return 1...600
         case .speed: return 0...60
+        case .effort: return Effort.range(store.effortKind ?? "rir")
+        case .rest: return 0...600
         }
     }
     private var title: Text {
@@ -767,6 +803,8 @@ struct ValueEditor: View {
         case .seconds: return Text("Hold")
         case .minutes: return Text("Minutes")
         case .speed: return store.speedUnit == "mph" ? Text("Speed (mph)") : Text("Speed (km/h)")
+        case .effort: return Text(verbatim: Effort.label(store.effortKind ?? "rir"))
+        case .rest: return Text("Rest timer")
         }
     }
     private var suffix: String? {
@@ -776,6 +814,8 @@ struct ValueEditor: View {
         case .seconds: return "s"
         case .minutes: return "min"
         case .speed: return Speed.label(store.speedUnit)
+        case .effort: return nil
+        case .rest: return "s"
         }
     }
 
@@ -817,6 +857,12 @@ struct ValueEditor: View {
             if field == .weight {
                 Text(verbatim: "± \(formatNumber(step)) \(unit)").font(.system(size: 10)).foregroundStyle(.secondary)
             }
+            // No effort for this set after all: empty again, as the phone's − below the scale does.
+            if field == .effort {
+                Button { cleared = true; store.effort = nil; dismiss() } label: { Text("None").font(.footnote) }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+            }
             Spacer(minLength: 2)
             Button { save(); dismiss() } label: {
                 Text("Done").font(.body.weight(.semibold)).frame(maxWidth: .infinity, minHeight: Theme.tap)
@@ -832,6 +878,9 @@ struct ValueEditor: View {
             case .seconds: value = store.seconds
             case .minutes: value = store.minutes
             case .speed: value = store.speed
+            // Empty starts where the phone's stepper does: the bottom of the scale.
+            case .effort: value = store.effort ?? Effort.range(store.effortKind ?? "rir").lowerBound
+            case .rest: value = store.restSeconds
             }
             focused = true
         }
@@ -852,6 +901,8 @@ struct ValueEditor: View {
         case .seconds: store.seconds = max(5, value)
         case .minutes: store.minutes = max(1, value.rounded())
         case .speed: store.speed = max(0, (value * 10).rounded() / 10)
+        case .effort: if !cleared { store.effort = value }
+        case .rest: store.setRest(value)
         }
     }
 

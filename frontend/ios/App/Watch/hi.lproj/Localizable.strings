@@ -41,6 +41,11 @@
 "Discard workout?" = "वर्कआउट छोड़ें?";
 "Discard" = "छोड़ें";
 "How to do it" = "कैसे करें";
+"Effort" = "मेहनत";
+"None" = "कोई नहीं";
+"Rest timer" = "आराम टाइमर";
+"Move up" = "ऊपर ले जाएँ";
+"Move down" = "नीचे ले जाएँ";
 "The sets you logged in this session will be lost." = "इस सत्र में दर्ज किए सेट खो जाएँगे।";
 "Last time: %@" = "पिछली बार: %@";
 "Recent" = "हाल के";

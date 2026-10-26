@@ -41,6 +41,11 @@
 "Discard workout?" = "운동을 버릴까요?";
 "Discard" = "버리기";
 "How to do it" = "하는 방법";
+"Effort" = "강도";
+"None" = "없음";
+"Rest timer" = "휴식 타이머";
+"Move up" = "위로 이동";
+"Move down" = "아래로 이동";
 "The sets you logged in this session will be lost." = "이 세션에서 기록한 세트가 사라집니다.";
 "Last time: %@" = "지난번: %@";
 "Recent" = "최근";

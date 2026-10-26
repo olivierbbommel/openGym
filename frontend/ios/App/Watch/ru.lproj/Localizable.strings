@@ -41,6 +41,11 @@
 "Discard workout?" = "Отменить тренировку?";
 "Discard" = "Отменить";
 "How to do it" = "Как выполнять";
+"Effort" = "Усилие";
+"None" = "Нет";
+"Rest timer" = "Таймер отдыха";
+"Move up" = "Переместить вверх";
+"Move down" = "Переместить вниз";
 "The sets you logged in this session will be lost." = "Подходы, записанные в этой сессии, будут потеряны.";
 "Last time: %@" = "В прошлый раз: %@";
 "Recent" = "Недавние";

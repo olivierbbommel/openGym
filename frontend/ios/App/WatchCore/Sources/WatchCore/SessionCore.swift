@@ -42,6 +42,9 @@ struct PendingTick: Codable, Equatable {
     /// Cardio: minutes and speed (km/h).
     var min: Double?
     var speed: Double?
+    /// The effort logged with it.
+    var rir: Double?
+    var rpe: Double?
 }
 
 struct SessionState: Codable, Equatable {
@@ -84,6 +87,8 @@ struct WatchEdit: Codable, Equatable {
     var rows: [SetRow]?
     /// addExercise, swapExercise: the exercise that came in.
     var added: Entry?
+    /// moveExercise: up (-1) or down (1); setRest: the seconds.
+    var by: Int?
 }
 
 typealias Event = [String: Any]
@@ -130,6 +135,11 @@ enum SessionCore {
             let applied = Set(snap.applied ?? [])
             let open = snap.applied == nil ? [] : edits.filter { !applied.contains($0.id) }
             for e in open { next = applyEdit(next, e) }
+            // A rest time changed here: the session's until the phone has it too.
+            if let r = open.last(where: { $0.kind == "setRest" })?.by {
+                next.restSec = Double(r)
+                s.restSec = Double(r)
+            }
             s.edits = open.isEmpty ? nil : open
         }
         // The watch's ticks the phone has not shown yet win; the later tick wins on a set both changed.
@@ -146,6 +156,8 @@ enum SessionCore {
                         if let sec = p.sec { next.entries[ei].sets[si].sec = sec }
                         if let m = p.min { next.entries[ei].sets[si].min = m }
                         if let v = p.speed { next.entries[ei].sets[si].speed = v }
+                        if let v = p.rir { next.entries[ei].sets[si].rir = v }
+                        if let v = p.rpe { next.entries[ei].sets[si].rpe = v }
                         next.entries[ei].sets[si].at = p.at
                     }
                 }
@@ -190,7 +202,7 @@ enum SessionCore {
     /// A set ticked here: the state with it done, and the event for the phone. `side` ticks one
     /// side of a per-side set; `sec` is a hold's seconds; a cardio set carries its minutes and speed.
     static func tick(_ s0: SessionState, entry ei: Int, set si: Int, side: String? = nil, w: Double?, r: Double?, sec: Double? = nil,
-                     min: Double? = nil, speed: Double? = nil,
+                     min: Double? = nil, speed: Double? = nil, rir: Double? = nil, rpe: Double? = nil,
                      at: Double, id: String, hr: [String: Double]? = nil) -> (SessionState, Event?) {
         guard var workout = s0.workout, workout.entries.indices.contains(ei), workout.entries[ei].sets.indices.contains(si) else { return (s0, nil) }
         var s = s0
@@ -205,10 +217,12 @@ enum SessionCore {
             if let sec = sec { workout.entries[ei].sets[si].sec = sec }
             if let m = min { workout.entries[ei].sets[si].min = m }
             if let v = speed { workout.entries[ei].sets[si].speed = v }
+            if let v = rir { workout.entries[ei].sets[si].rir = v }
+            if let v = rpe { workout.entries[ei].sets[si].rpe = v }
             workout.entries[ei].sets[si].at = at
         }
         s.workout = workout
-        s.pending[key(e.id, si, oneSide)] = PendingTick(w: w, r: r, at: at, sec: sec, min: min, speed: speed)
+        s.pending[key(e.id, si, oneSide)] = PendingTick(w: w, r: r, at: at, sec: sec, min: min, speed: speed, rir: rir, rpe: rpe)
         var event: Event = [
             "id": id, "type": "setDone", "wid": workout.id ?? "", "exId": e.id,
             "entryIdx": ei, "setIdx": si, "at": at,
@@ -218,6 +232,8 @@ enum SessionCore {
         if let sec = sec { event["sec"] = sec }
         if let m = min { event["min"] = m }
         if let v = speed { event["speed"] = v }
+        if let v = rir { event["rir"] = v }
+        if let v = rpe { event["rpe"] = v }
         if let side = oneSide { event["side"] = side }
         if let hr = hr { event["hr"] = hr }
         return (s, event)
@@ -242,6 +258,8 @@ enum SessionCore {
         switch e.kind {
         case "swapExercise":
             if let added = e.added { w.entries = swapped(w.entries, at: ei, with: added).entries }
+        case "moveExercise":
+            if let d = e.by, let m = moved(w.entries, at: ei, by: d) { w.entries = m.entries }
         case "addSet":
             w.entries[ei].sets.append(contentsOf: e.rows ?? [])
         case "removeSet":
@@ -400,6 +418,48 @@ enum SessionCore {
         remember(&s, WatchEdit(id: id, kind: "swapExercise", exId: old.id, entry: ei, set: nil, rows: nil, added: w.entries[idx]))
         return (s, ["id": id, "type": "swapExercise", "wid": w.id ?? "", "exId": old.id, "entryIdx": ei, "to": entry.id,
                     "index": idx, "rows": rowsPayload(w.entries[idx].sets), "at": at])
+    }
+
+    /// The supersets and lone exercises in order, each as its entries' places (the phone's units).
+    static func units(_ entries: [Entry]) -> [[Int]] {
+        var out: [[Int]] = []
+        for i in entries.indices {
+            if let g = entries[i].group, i > 0, entries[i - 1].group == g, !out.isEmpty { out[out.count - 1].append(i) }
+            else { out.append([i]) }
+        }
+        return out
+    }
+
+    /// `entries` with the unit of exercise `ei` (its superset, or itself) moved past the next one up
+    /// (`by` -1) or down (1), as the phone's moveActiveWorkoutUnit; and where exercise `ei` is now.
+    static func moved(_ entries: [Entry], at ei: Int, by d: Int) -> (entries: [Entry], index: Int)? {
+        var u = units(entries)
+        guard d == 1 || d == -1, let src = u.firstIndex(where: { $0.contains(ei) }), u.indices.contains(src + d) else { return nil }
+        u.swapAt(src, src + d)
+        let order = u.flatMap { $0 }
+        return (order.map { entries[$0] }, order.firstIndex(of: ei) ?? ei)
+    }
+
+    /// Exercise `ei` (with its superset) moved up or down here, and still the one on screen.
+    static func moveExercise(_ s0: SessionState, entry ei: Int, by d: Int, at: Double, id: String) -> (SessionState, Event?) {
+        guard var w = s0.workout, w.entries.indices.contains(ei), let m = moved(w.entries, at: ei, by: d) else { return (s0, nil) }
+        var s = s0
+        let exId = w.entries[ei].id
+        w.entries = m.entries
+        s.workout = w
+        s.entryIndex = m.index
+        remember(&s, WatchEdit(id: id, kind: "moveExercise", exId: exId, entry: ei, by: d))
+        return (s, ["id": id, "type": "moveExercise", "wid": w.id ?? "", "exId": exId, "entryIdx": ei, "direction": d, "at": at])
+    }
+
+    /// The rest between sets from now on (the phone's rest timer setting), in seconds, 0 for none.
+    static func setRest(_ s0: SessionState, seconds: Double, at: Double, id: String) -> (SessionState, Event?) {
+        let sec = (min(600, max(0, seconds)) / 5).rounded() * 5
+        var s = s0
+        s.restSec = sec
+        s.workout?.restSec = sec
+        if s.workout != nil { remember(&s, WatchEdit(id: id, kind: "setRest", exId: "", entry: 0, by: Int(sec))) }
+        return (s, ["id": id, "type": "setRest", "sec": sec, "wid": s.workout?.id ?? "", "at": at])
     }
 
     /// Keys "exId#i" (and "exId#i#side") of the sets after `si` moved up one; the one at `si` gone.

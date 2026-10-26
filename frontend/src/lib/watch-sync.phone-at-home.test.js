@@ -3,7 +3,7 @@
 // changed at the wrist, a workout started empty. The snapshot carries what that needs and still
 // fits; the watch's changes come back as events the workout screen applies with its own actions.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { editSavedWorkout, clipFor, libraryClipsFor, clipsMissing, readWatchClips, CLIP_LIBRARY_MAX, buildReady, buildSnapshot, buildExercises, fitSnapshot, READY_MAX, SNAPSHOT_MAX_BYTES, EXTRA_MAX, _resetWatchSync, applyEvents, bindWatchActions, bindWatchAppActions, alignToWatchRows, recentlyApplied } from './watch-sync.js'
+import { nextPlanned, editSavedWorkout, clipFor, libraryClipsFor, clipsMissing, readWatchClips, CLIP_LIBRARY_MAX, buildReady, buildSnapshot, buildExercises, fitSnapshot, READY_MAX, SNAPSHOT_MAX_BYTES, EXTRA_MAX, _resetWatchSync, applyEvents, bindWatchActions, bindWatchAppActions, alignToWatchRows, recentlyApplied } from './watch-sync.js'
 import { swapActiveExercise } from './active-exercise-swap.js'
 import { buildCompletedWorkout } from './finish-workout.js'
 import { bestWeightForEntry } from './history.js'
@@ -305,6 +305,41 @@ describe('changes from the wrist after the phone saved the workout', () => {
     bindWatchAppActions({ patchWorkout })
     expect(applyEvents([{ id: 'e1', type: 'addSet', wid: 'w-0', exId: '0025', entryIdx: 0, rows: [{ w: 1, r: 1 }], at: 1 }], () => ({ S }))).toEqual(['e1'])
     expect(patchWorkout).toHaveBeenCalledWith('w-0', expect.any(Function))
+  })
+})
+
+describe('effort, order and rest at the wrist', () => {
+  it('a tick carries its effort, capped to the scale', () => {
+    const S = { active: { id: 'w-1', entries: [{ id: '0025', sets: [{ w: 60, r: 8, done: false }] }] } }
+    const setDone = vi.fn()
+    bindWatchActions({ setDone })
+    applyEvents([{ id: 'f1', type: 'setDone', wid: 'w-1', exId: '0025', entryIdx: 0, setIdx: 0, w: 60, r: 8, rir: 14, at: 1 }], () => ({ S }))
+    expect(setDone).toHaveBeenCalledWith(0, 0, expect.objectContaining({ rir: 10 }))
+    expect(buildSnapshot({ ...S, active: { ...S.active, entries: [{ id: '0025', sets: [{ w: 60, r: 8, rir: 2, done: true }] }] } }).active.entries[0].sets[0].rir).toBe(2)
+  })
+
+  it('a move goes through the workout screen\'s own move; a rest time sets the phone\'s rest timer', () => {
+    const S = { active: { id: 'w-1', entries: [{ id: 'a', sets: [] }, { id: 'b', sets: [] }] } }
+    const moveExercise = vi.fn(), setRest = vi.fn()
+    bindWatchActions({ moveExercise })
+    bindWatchAppActions({ setRest })
+    expect(applyEvents([
+      { id: 'm1', type: 'moveExercise', wid: 'w-1', exId: 'b', entryIdx: 1, direction: -1, at: 1 },
+      { id: 'm2', type: 'moveExercise', wid: 'w-1', exId: 'b', entryIdx: 1, direction: 5, at: 2 },   // not a move
+      { id: 'r1', type: 'setRest', sec: 9000, at: 3 },
+    ], () => ({ S }))).toEqual(['m1', 'm2', 'r1'])
+    expect(moveExercise).toHaveBeenCalledTimes(1)
+    expect(moveExercise).toHaveBeenCalledWith(1, -1)
+    expect(setRest).toHaveBeenCalledWith(600)
+  })
+
+  it('on a rest day the watch is told the next planned routine and its day', () => {
+    const plan = { routines: [{ id: 'r1', name: 'Push A', ex: [] }], week: { 3: 'r1' }, dayPlan: {} }   // Wednesdays
+    const next = nextPlanned(plan, '2026-10-26')   // a Monday
+    expect(next.name).toBe('Push A')
+    expect(next.day).toMatch(/Wed/)
+    expect(nextPlanned({ routines: [], week: {} }, '2026-10-26')).toBeUndefined()
+    expect(buildReady({ ...plan, workouts: [], unit: 'kg' }, '2026-10-26').next.name).toBe('Push A')
   })
 })
 
