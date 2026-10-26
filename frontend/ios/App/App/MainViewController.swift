@@ -34,6 +34,10 @@ class MainViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(WidgetBridgePlugin())
         bridge?.registerPluginInstance(LiveActivityPlugin())
         WidgetPreview.runIfAsked()
+        loadObservation = webView?.observe(\.isLoading, options: [.new]) { [weak self] web, _ in
+            guard !web.isLoading else { return }
+            DispatchQueue.main.async { self?.sentInsets = nil; self?.passReservedRegions() }
+        }
         // Switched while the app runs: the page follows at once.
         NotificationCenter.default.addObserver(forName: UIAccessibility.reduceTransparencyStatusDidChangeNotification,
                                                object: nil, queue: .main) { [weak self] _ in
@@ -43,6 +47,57 @@ class MainViewController: CAPBridgeViewController {
         if ProcessInfo.processInfo.arguments.contains(MainViewController.pendingProbeArgument) {
             DispatchQueue.main.async { [weak self] in self?.showPendingProbe() }
         }
+    }
+
+    /* ---------- the iPhone Duo's reserved regions ---------- */
+
+    /// The edges last handed to the page, so a layout pass that changes nothing sends nothing.
+    private var sentInsets: UIEdgeInsets?
+    /// A page (re)loaded starts without them: sent again each time one finishes loading.
+    private var loadObservation: NSKeyValueObservation?
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        passReservedRegions()
+    }
+
+    /**
+     * The folded iPhone Duo keeps a region of the screen for its camera and status pill (a
+     * "reserved region", iOS 27.1). It is not part of the safe area a web view's
+     * env(safe-area-inset-*) reports, so the page laid its bars and its message box under it.
+     * Each active region is handed to the page as the edge it sits against (--native-sat, -sar,
+     * -sab, -sal; index.css takes the larger of those and env()), which is all the layout needs.
+     */
+    private func passReservedRegions() {
+        guard #available(iOS 27.1, *), let web = webView else { return }
+        let rects = web.reservedRegions(kind: .occlusion).filter { $0.isActive }.map { $0.frame }
+        let insets = MainViewController.edgeInsets(of: rects, in: web.bounds)
+        guard insets != sentInsets else { return }
+        sentInsets = insets
+        web.evaluateJavaScript(MainViewController.insetScript(insets))
+    }
+
+    /// The inset each region asks of the edge it is nearest to, the largest per edge.
+    static func edgeInsets(of rects: [CGRect], in bounds: CGRect) -> UIEdgeInsets {
+        var e = UIEdgeInsets.zero
+        for rect in rects {
+            let r = rect.intersection(bounds)
+            guard !r.isNull, r.width > 0, r.height > 0 else { continue }
+            let gaps = [(bounds.maxX - r.maxX, 0), (r.minX - bounds.minX, 1), (r.minY - bounds.minY, 2), (bounds.maxY - r.maxY, 3)]
+            switch gaps.min(by: { $0.0 < $1.0 })!.1 {
+            case 0: e.right = max(e.right, bounds.maxX - r.minX)
+            case 1: e.left = max(e.left, r.maxX - bounds.minX)
+            case 2: e.top = max(e.top, r.maxY - bounds.minY)
+            default: e.bottom = max(e.bottom, bounds.maxY - r.minY)
+            }
+        }
+        return e
+    }
+
+    static func insetScript(_ e: UIEdgeInsets) -> String {
+        let px = { (v: CGFloat) in "\(Int(v.rounded(.up)))px" }
+        return "(function(s){s.setProperty('--native-sat','\(px(e.top))');s.setProperty('--native-sar','\(px(e.right))');"
+            + "s.setProperty('--native-sab','\(px(e.bottom))');s.setProperty('--native-sal','\(px(e.left))')})(document.documentElement.style)"
     }
 
     /**
