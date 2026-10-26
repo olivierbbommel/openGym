@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, forwardRef, useSyncExternalStore } from 'react'
 import { useNavigate, useParams, useLocation, Navigate } from 'react-router-dom'
 import { useStore, DEF, hasData } from '../store/useStore.js'
-import { healthStatus, loadHealth, enableHealth, disableHealth, openHealthConnect, onHealthChange } from '../lib/health-sync.js'
+import { healthStatus, loadHealth, enableHealth, disableHealth, openHealthConnect, onHealthChange, importHealthCardio, setHealthImport } from '../lib/health-sync.js'
 import { workoutControls } from '../lib/workout-controls.js'
 import { speedUnitOf } from '../lib/speed.js'
 import { formulaOf, FORMULA_NAMES } from '../lib/onerm.js'
@@ -1570,6 +1570,14 @@ function HealthConnectCard({ S, toast, android }) {
     catch { toast(c.removeFailed) }
     setBusy(false)
   }
+  // Gym cardio from Apple's Workout app (lib/health-import.js): asks to read workouts if it never did.
+  const importNow = async () => {
+    if (busy) return
+    setBusy(true)
+    const r = await importHealthCardio(useStore, { ask: true, manual: true }).catch(() => null)
+    setBusy(false)
+    toast(r?.added ? t('Cardio imported: {0}', r.added) : t('Nothing new to import'))
+  }
   // Off can mean two things for what is already there, so it asks; closing the sheet keeps it on.
   const askOff = () => menuSheet({
     title: c.stop,
@@ -1591,6 +1599,12 @@ function HealthConnectCard({ S, toast, android }) {
         title={t('Permission withdrawn. Tap to allow again')} accessory="chevron" onClick={turnOn} />}
       {h.on && <Row icon="list" iconTint="var(--blue)" title={c.open}
         accessory="chevron" onClick={() => openHealthConnect().catch(() => {})} />}
+      {ios && <Row icon="heart" iconTint="var(--green)" title={t('Import gym cardio')}
+        subtitle={t('Treadmill, bike, elliptical, stairs and rowing from the Workout app.')}>
+        <Switch checked={!h.importOff} disabled={busy} onChange={v => setHealthImport(v).then(setH).catch(() => {})} />
+      </Row>}
+      {ios && <Row icon="download" iconTint="var(--green)" title={t('Import from Apple Health now')}
+        accessory="chevron" onClick={importNow} />}
     </Section>
   )
 }

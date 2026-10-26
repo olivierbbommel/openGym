@@ -1535,6 +1535,11 @@ export const PT_BR_OVERRIDES = {
   // --- import with no account: workouts on this device ---
   'This device has 1 workout that is not in this backup. Replacing deletes it.': 'Este dispositivo tem 1 treino que não está neste backup. Substituir exclui esse treino.',
   'This device has {0} workouts that are not in this backup. Replacing deletes them.': 'Este dispositivo tem {0} treinos que não estão neste backup. Substituir exclui esses treinos.',
+  // --- Apple Health: gym cardio from the Workout app ---
+  'Import gym cardio': 'Importar cardio da academia',
+  'Treadmill, bike, elliptical, stairs and rowing from the Workout app.': 'Esteira, bike, elíptico, escada e remo do app Exercício.',
+  'Import from Apple Health now': 'Importar agora do Saúde',
+  'Cardio imported: {0}': 'Cardio importado: {0}',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

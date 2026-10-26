@@ -2411,4 +2411,9 @@ export default {
   // --- import with no account: workouts on this device ---
   'This device has 1 workout that is not in this backup. Replacing deletes it.': 'На цьому пристрої є 1 тренування, якого немає в цій копії. Заміна його видалить.',
   'This device has {0} workouts that are not in this backup. Replacing deletes them.': 'На цьому пристрої є тренування, яких немає в цій копії ({0}). Заміна їх видалить.',
+  // --- Apple Health: gym cardio from the Workout app ---
+  'Import gym cardio': 'Імпорт кардіо із залу',
+  'Treadmill, bike, elliptical, stairs and rowing from the Workout app.': 'Бігова доріжка, велотренажер, еліпс, степер і веслування з програми «Тренування».',
+  'Import from Apple Health now': 'Імпортувати зі «Здоров’я» зараз',
+  'Cardio imported: {0}': 'Імпортовано кардіо: {0}',
 }

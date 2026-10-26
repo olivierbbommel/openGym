@@ -376,6 +376,8 @@ export default function App() {
     })
     return () => { gone = true; stop?.(); unbind() }
   }, [])
+  // iPhone app: gym cardio from Apple Health (lib/health-import.js), at launch and on return.
+  useEffect(() => { if (MOBILE) import('./lib/health-sync.js').then(m => m.initHealthImport(useStore)).catch(() => {}) }, [])
   // iPhone app: the Home Screen widgets and the workout's Live Activity (lib/widgets.js,
   // lib/live-activity.js). Nothing at all on the web or on Android.
   useEffect(() => {

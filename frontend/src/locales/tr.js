@@ -2414,4 +2414,9 @@ export default {
   // --- import with no account: workouts on this device ---
   'This device has 1 workout that is not in this backup. Replacing deletes it.': 'Bu cihazda bu yedekte olmayan 1 antrenman var. Değiştirmek onu siler.',
   'This device has {0} workouts that are not in this backup. Replacing deletes them.': 'Bu cihazda bu yedekte olmayan {0} antrenman var. Değiştirmek onları siler.',
+  // --- Apple Health: gym cardio from the Workout app ---
+  'Import gym cardio': 'Spor salonu kardiyosunu içe aktar',
+  'Treadmill, bike, elliptical, stairs and rowing from the Workout app.': 'Antrenman uygulamasından koşu bandı, bisiklet, eliptik, step ve kürek.',
+  'Import from Apple Health now': 'Şimdi Sağlık’tan içe aktar',
+  'Cardio imported: {0}': 'İçe aktarılan kardiyo: {0}',
 }

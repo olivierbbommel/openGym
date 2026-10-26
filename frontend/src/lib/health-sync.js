@@ -197,3 +197,69 @@ export function initHealthSync(getState) {
   // also settles whether it is on, which the saves wait for (syncHealth).
   setTimeout(() => loadHealth().then(h => { mirrorOn(h.on); return syncHealth(getState()) }).catch(() => {}), 3000)
 }
+
+/* ---------- cardio from Apple Health (the iPhone app, lib/health-import.js) ---------- */
+
+// Where the last read of Apple Health stopped (`importAnchor`), the sessions waiting for a workout
+// running here to be saved (`importWait`), and the switch (`importOff`) live in this phone's file:
+// what was taken lives in the profile (`healthImported`), so another phone does not take it again.
+let importing = null
+
+/**
+ * Takes the gym cardio Apple's Workout app recorded since the last time into the log. `ask`: asks
+ * to read workouts first, if that was never asked (the Settings button). A no-op off the iPhone,
+ * while switched off (unless `manual`), and before boot has the profile (an import into a copy
+ * about to be replaced would be lost). Resolves with { added } (how many came in), or null.
+ */
+export function importHealthCardio (store, { ask = false, manual = false } = {}) {
+  if (!MOBILE) return Promise.resolve(null)
+  if (importing) return importing
+  importing = (async () => {
+    try {
+      const p = await plugin()
+      if (p?.platform !== 'ios' || store.getState().ready === false) return null
+      const h = await loadHealth()
+      if (h.importOff && !manual) return null
+      const r = await p.HC.cardio({ anchor: h.importAnchor || null, ask })
+      const items = [...(Array.isArray(h.importWait) ? h.importWait : []), ...(Array.isArray(r?.items) ? r.items : [])]
+      let out = { added: [], wait: [] }
+      if (items.length) {
+        const { importCardio } = await import('./health-import.js')
+        const { t } = await import('./i18n-core.js')
+        // The store's own update: stamped, saved and synced like any change made here.
+        store.getState().update(s => { out = importCardio(s, items, { name: t('Cardio') }) })
+      }
+      const wait = [...new Map(out.wait.map(x => [x.uuid, x])).values()]
+      await saveHealth({ ...(await loadHealth()), importAnchor: r?.anchor || h.importAnchor || null, importWait: wait, importAt: Date.now() })
+      return { added: out.added.length }
+    } catch { return null } finally { importing = null }
+  })()
+  return importing
+}
+
+/** The Settings switch: on (the default) imports at every launch and return to the app. */
+export async function setHealthImport (on) {
+  const h = await loadHealth()
+  const out = { ...h, importOff: !on }
+  await saveHealth(out)
+  told(out)
+  return out
+}
+
+let importStarted = false
+/** At launch (once the profile is in) and whenever the app comes back to the front. */
+export function initHealthImport (store) {
+  if (!MOBILE || importStarted) return
+  importStarted = true
+  const go = () => { importHealthCardio(store).catch(() => {}) }
+  import('@capacitor/app').then(({ App }) => {
+    App.addListener('appStateChange', ({ isActive }) => { if (isActive) go() })
+  }).catch(() => {})
+  if (store.getState().ready !== false) setTimeout(go, 3000)
+  const off = store.subscribe((s, prev) => {
+    if (s.ready && !prev.ready) setTimeout(go, 3000)
+    // A workout saved here: the cardio of its day that waited for it goes on it now.
+    else if (prev.S?.active && !s.S?.active) setTimeout(go, 1000)
+  })
+  return off
+}

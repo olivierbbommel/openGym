@@ -79,6 +79,7 @@ import { convertStateUnit, convertBodyWeight } from './units.js'
 import { sanitizeAccent } from './accent.js'
 import { readDayNote as readNote } from './day-notes.js'
 import { mergeInbox, putInbox } from './watch-inbox.js'
+import { IMPORTED_MAX } from './health-import.js'
 
 const clone = o => JSON.parse(JSON.stringify(o))
 const list = v => (Array.isArray(v) ? v : [])
@@ -874,6 +875,11 @@ export function mergeStates(a0, b0, { prefer } = {}) {
   // event from either copy, less what either applied. The newer copy alone would drop the
   // watch's upload whenever the phone pushed over it.
   putInbox(out, mergeInbox(n, o))
+  // The Apple Health workouts either copy imported (lib/health-import.js): taken on one phone is
+  // taken on all, and one deleted after it stays deleted.
+  if (list(n.healthImported).length || list(o.healthImported).length) {
+    out.healthImported = [...new Set([...list(o.healthImported), ...list(n.healthImported)])].slice(-IMPORTED_MAX)
+  }
   out._ts = Math.max(a._ts || 0, b._ts || 0)
   if (resetAt) out.resetAt = resetAt
   if (resetIds) out.resetIds = resetIds

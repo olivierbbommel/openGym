@@ -2414,4 +2414,9 @@ export default {
   // --- import with no account: workouts on this device ---
   'This device has 1 workout that is not in this backup. Replacing deletes it.': '此设备上有 1 次训练不在此备份中。替换会删除它。',
   'This device has {0} workouts that are not in this backup. Replacing deletes them.': '此设备上有 {0} 次训练不在此备份中。替换会删除它们。',
+  // --- Apple Health: gym cardio from the Workout app ---
+  'Import gym cardio': '导入健身房有氧',
+  'Treadmill, bike, elliptical, stairs and rowing from the Workout app.': '来自“体能训练”App 的跑步机、单车、椭圆机、登梯机和划船机。',
+  'Import from Apple Health now': '立即从“健康”导入',
+  'Cardio imported: {0}': '已导入有氧：{0}',
 }

@@ -2469,4 +2469,9 @@ export default {
   // --- import with no account: workouts on this device ---
   'This device has 1 workout that is not in this backup. Replacing deletes it.': 'على هذا الجهاز تمرين واحد ليس في هذه النسخة الاحتياطية. الاستبدال يحذفه.',
   'This device has {0} workouts that are not in this backup. Replacing deletes them.': 'على هذا الجهاز {0} تمارين ليست في هذه النسخة الاحتياطية. الاستبدال يحذفها.',
+  // --- Apple Health: gym cardio from the Workout app ---
+  'Import gym cardio': 'استيراد تمارين الكارديو في الصالة',
+  'Treadmill, bike, elliptical, stairs and rowing from the Workout app.': 'جهاز المشي والدراجة والإهليلجي والدرج والتجديف من تطبيق التمرين.',
+  'Import from Apple Health now': 'استيراد الآن من صحتي',
+  'Cardio imported: {0}': 'تم استيراد الكارديو: {0}',
 }

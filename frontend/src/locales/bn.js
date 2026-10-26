@@ -2493,4 +2493,9 @@ export default {
   // --- import with no account: workouts on this device ---
   'This device has 1 workout that is not in this backup. Replacing deletes it.': 'এই ডিভাইসে ১টি ওয়ার্কআউট আছে যা এই ব্যাকআপে নেই। প্রতিস্থাপন করলে এটি মুছে যাবে।',
   'This device has {0} workouts that are not in this backup. Replacing deletes them.': 'এই ডিভাইসে {0}টি ওয়ার্কআউট আছে যা এই ব্যাকআপে নেই। প্রতিস্থাপন করলে এগুলো মুছে যাবে।',
+  // --- Apple Health: gym cardio from the Workout app ---
+  'Import gym cardio': 'জিম কার্ডিও আমদানি করুন',
+  'Treadmill, bike, elliptical, stairs and rowing from the Workout app.': 'ওয়ার্কআউট অ্যাপ থেকে ট্রেডমিল, বাইক, এলিপটিক্যাল, সিঁড়ি ও রোয়িং।',
+  'Import from Apple Health now': 'এখনই হেলথ থেকে আমদানি করুন',
+  'Cardio imported: {0}': 'কার্ডিও আমদানি হয়েছে: {0}',
 }

@@ -2418,4 +2418,9 @@ export default {
   // --- import with no account: workouts on this device ---
   'This device has 1 workout that is not in this backup. Replacing deletes it.': 'На этом устройстве есть 1 тренировка, которой нет в этой копии. Замена её удалит.',
   'This device has {0} workouts that are not in this backup. Replacing deletes them.': 'На этом устройстве есть тренировки, которых нет в этой копии ({0}). Замена их удалит.',
+  // --- Apple Health: gym cardio from the Workout app ---
+  'Import gym cardio': 'Импорт кардио из зала',
+  'Treadmill, bike, elliptical, stairs and rowing from the Workout app.': 'Беговая дорожка, велотренажёр, эллипс, степпер и гребля из приложения «Тренировка».',
+  'Import from Apple Health now': 'Импортировать из «Здоровья» сейчас',
+  'Cardio imported: {0}': 'Импортировано кардио: {0}',
 }

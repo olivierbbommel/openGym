@@ -27,6 +27,7 @@ public class AppleHealthPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "remove", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "openSettings", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setEnabled", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "cardio", returnType: CAPPluginReturnPromise),
     ]
 
     static let enabledKey = "healthEnabled"
@@ -111,6 +112,81 @@ public class AppleHealthPlugin: CAPPlugin, CAPBridgedPlugin {
         } else {
             call.reject(error.localizedDescription, "failed")
         }
+    }
+
+    /* ---------- cardio from Apple's Workout app (lib/health-import.js) ---------- */
+
+    /// The kinds of session lib/health-import.js takes, by the name it knows them by.
+    private static let cardioKinds: [HKWorkoutActivityType: String] = [
+        .running: "running", .walking: "walking", .cycling: "cycling", .elliptical: "elliptical",
+        .stairClimbing: "stairs", .stairs: "stairs", .stepTraining: "stairs", .rowing: "rowing",
+    ]
+    /// The first look back, before there is an anchor: the last month, not years of history.
+    private static let firstLookBackDays: Double = 30
+
+    /// The workouts Apple Health gained since `anchor` (base64, from the last call; none: the last
+    /// month) that Apple's own apps recorded (the Workout app, a gym machine tapped with the watch),
+    /// never one openGym wrote: { items, anchor }. Reading workouts is asked for if it never was
+    /// (`ask`); Apple Health never says whether reading was allowed, so a refusal reads as nothing new.
+    @objc func cardio(_ call: CAPPluginCall) {
+        guard HKHealthStore.isHealthDataAvailable() else { call.resolve(["items": [], "anchor": NSNull()]); return }
+        let ask = call.getBool("ask") ?? false
+        let run = {
+            var anchor: HKQueryAnchor? = nil
+            if let b64 = call.getString("anchor"), let data = Data(base64Encoded: b64) {
+                anchor = try? NSKeyedUnarchiver.unarchivedObject(ofClass: HKQueryAnchor.self, from: data)
+            }
+            let since = anchor == nil ? HKQuery.predicateForSamples(withStart: Date().addingTimeInterval(-AppleHealthPlugin.firstLookBackDays * 86400), end: nil) : nil
+            let q = HKAnchoredObjectQuery(type: HKObjectType.workoutType(), predicate: since, anchor: anchor, limit: HKObjectQueryNoLimit) { _, added, _, next, error in
+                if let error = error { self.fail(call, error); return }
+                let items = (added ?? []).compactMap { $0 as? HKWorkout }.compactMap { self.cardioItem($0) }
+                var nextB64: Any = NSNull()
+                if let next = next, let data = try? NSKeyedArchiver.archivedData(withRootObject: next, requiringSecureCoding: true) {
+                    nextB64 = data.base64EncodedString()
+                }
+                call.resolve(["items": items, "anchor": nextB64])
+            }
+            self.store.execute(q)
+        }
+        if ask {
+            store.requestAuthorization(toShare: [], read: [HKObjectType.workoutType()]) { _, _ in run() }
+        } else { run() }
+    }
+
+    private func cardioItem(_ w: HKWorkout) -> [String: Any]? {
+        guard let kind = AppleHealthPlugin.cardioKinds[w.workoutActivityType] else { return nil }
+        // Apple's own apps only (the Workout app on the watch is com.apple.*), never ours: our
+        // bundle ids are not Apple's, and what we wrote carries our sync identifier besides.
+        let source = w.sourceRevision.source.bundleIdentifier
+        guard source.hasPrefix("com.apple.") else { return nil }
+        if let sync = w.metadata?[HKMetadataKeySyncIdentifier] as? String, sync.hasPrefix("opengym-") { return nil }
+        var item: [String: Any] = [
+            "uuid": w.uuid.uuidString, "type": kind,
+            "indoor": (w.metadata?[HKMetadataKeyIndoorWorkout] as? NSNumber)?.boolValue ?? false,
+            "start": w.startDate.timeIntervalSince1970 * 1000, "end": w.endDate.timeIntervalSince1970 * 1000,
+            "sec": w.duration,
+        ]
+        if let meters = distance(of: w), meters > 0 { item["meters"] = meters }
+        if let kcal = energy(of: w), kcal > 0 { item["kcal"] = kcal }
+        return item
+    }
+
+    private func distance(of w: HKWorkout) -> Double? {
+        if #available(iOS 16.0, *) {
+            for (type, stats) in w.allStatistics where type.identifier.hasPrefix("HKQuantityTypeIdentifierDistance") {
+                if let q = stats.sumQuantity() { return q.doubleValue(for: .meter()) }
+            }
+            return nil
+        }
+        return w.totalDistance?.doubleValue(for: .meter())
+    }
+
+    private func energy(of w: HKWorkout) -> Double? {
+        if #available(iOS 16.0, *) {
+            guard let type = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) else { return nil }
+            return w.statistics(for: type)?.sumQuantity()?.doubleValue(for: .kilocalorie())
+        }
+        return w.totalEnergyBurned?.doubleValue(for: .kilocalorie())
     }
 
     /// Each write a newer version than the last, so Apple Health replaces the one it has.
