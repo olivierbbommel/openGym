@@ -7,6 +7,7 @@ import { t } from '../lib/i18n.js'
 import { deviceId } from '../lib/push.js'
 import { MOBILE } from '../lib/mobile.js'
 import { armRestAlert, bindNativeRest, disarmRestAlert, holdRestAlert, toneNative } from '../lib/rest-alert.js'
+import { watchRunsSession } from '../lib/watch-settings.js'
 import { useStore } from './useStore.js'
 import { REST_MAX } from '../lib/duration.js'
 import { accentValue } from '../lib/accent.js'
@@ -26,6 +27,8 @@ const cancelPushRestTimer = () => { if (useStore.getState().user) api('/api/push
 const bookRestEnd = (endsAt, totalSec, kind) => {
   const switching = kind === 'switch'
   if (!MOBILE) { if (!switching) pushRestTimer(Math.max(1, Math.round((endsAt - Date.now()) / 1000))); return }
+  // The watch runs the workout and ends the rest on the wrist itself (lib/watch-settings.js).
+  if (watchRunsSession()) return
   const { S } = useStore.getState()
   armRestAlert(endsAt, { title: switching ? t('Switch sides') : t('Rest’s over. Next set!'), countdownTitle: switching ? t('Switch sides') : t('Rest'), totalSec, accent: accentValue(S), sound: !!S.sound, classic: restSoundOf(S) === 'classic', tone: restSoundOf(S), vibrate: S.vibrate !== false, alarmBuzz: S.vibrate !== false && !!S.vibrateOnSilent })
     .then(ok => {

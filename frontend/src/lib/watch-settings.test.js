@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // Settings → Apple Watch: this phone's choices for its watch, per device, never in the profile.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { readWatchPrefs, writeWatchPrefs, settingsForWatch, readWatchStatus, writeWatchStatus, onWatchPrefs, WATCH_DEFAULTS, SHOW_DEFAULTS } from './watch-settings.js'
+import { readWatchPrefs, writeWatchPrefs, settingsForWatch, readWatchStatus, writeWatchStatus, onWatchPrefs, WATCH_DEFAULTS, SHOW_DEFAULTS, watchRunsSession, WATCH_SESSION_TRUST_MS } from './watch-settings.js'
 import { applyEvents, bindWatchAppActions, _resetWatchSync } from './watch-sync.js'
 
 beforeEach(() => { localStorage.clear(); _resetWatchSync() })
@@ -33,9 +33,18 @@ describe('what the watch says about itself', () => {
   it('is kept for the page, whatever else waits in the queue', () => {
     bindWatchAppActions({ start: vi.fn(), patchSet: vi.fn() })
     expect(applyEvents([{ id: 's1', type: 'watchStatus', health: 'denied', version: '1.4.2', at: 5 }], () => ({ S: { active: null } }))).toEqual(['s1'])
-    expect(readWatchStatus()).toEqual({ health: 'denied', version: '1.4.2', at: 5 })
+    expect(readWatchStatus()).toEqual({ health: 'denied', session: false, version: '1.4.2', at: 5 })
     writeWatchStatus({ health: 'weird' })
     expect(readWatchStatus().health).toBeNull()
+  })
+
+  it('a running workout session on the watch leaves the end of a rest to it, for a few hours at most', () => {
+    const now = 10 * 60 * 60 * 1000
+    expect(watchRunsSession(writeWatchStatus({ health: 'on', session: true, at: now - 60000 }), now)).toBe(true)
+    expect(watchRunsSession(writeWatchStatus({ health: 'on', session: false, at: now }), now)).toBe(false)
+    // a watch that said so long ago and went quiet is not believed: the phone notifies again
+    expect(watchRunsSession({ session: true, at: now - WATCH_SESSION_TRUST_MS - 1 }, now)).toBe(false)
+    expect(watchRunsSession(null, now)).toBe(false)
   })
 })
 

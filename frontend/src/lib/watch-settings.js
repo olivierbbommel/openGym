@@ -62,10 +62,23 @@ export function readWatchStatus(storage = globalThis.localStorage) {
 
 export function writeWatchStatus(ev, storage = globalThis.localStorage) {
   const health = ['on', 'off', 'denied'].includes(ev?.health) ? ev.health : null
-  const next = { health, version: typeof ev?.version === 'string' ? ev.version.slice(0, 20) : null, at: Number(ev?.at) || Date.now() }
+  const next = { health, session: ev?.session === true, version: typeof ev?.version === 'string' ? ev.version.slice(0, 20) : null, at: Number(ev?.at) || Date.now() }
   try { storage?.setItem(WATCH_STATUS_KEY, JSON.stringify(next)) } catch { /* shown again next time */ }
   emit()
   return next
+}
+
+// How long a watch's word that its workout session runs is believed without hearing it again.
+export const WATCH_SESSION_TRUST_MS = 3 * 60 * 60 * 1000
+
+/**
+ * Whether the watch says a workout session is running on it (its app in front, the rest ending
+ * with its own tap on the wrist). The phone's own rest notification is then left out: iOS hands a
+ * locked phone's notification to the watch, and dismissing it there left the workout for the
+ * watch face. Said within the last few hours only: a watch that went quiet is not believed.
+ */
+export function watchRunsSession(status = readWatchStatus(), now = Date.now()) {
+  return !!status && status.session === true && now - (Number(status.at) || 0) < WATCH_SESSION_TRUST_MS
 }
 
 /** The choices as the watch reads them (WatchCore Model.swift WatchSettings); `health` is the phone's Apple Health switch. */
