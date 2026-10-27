@@ -22,7 +22,11 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
         didSet { UserDefaults.standard.set(enabled, forKey: WorkoutManager.enabledKey) }
     }
     @Published private(set) var heartRate: Double?
-    @Published private(set) var running = false
+    /// A workout session is running: watchOS keeps the app in front, and the phone, told
+    /// (SessionStore.sendStatus), leaves the end of a rest to the watch.
+    @Published private(set) var running = false { didSet { if running != oldValue { DispatchQueue.main.async { self.onStatus?() } } } }
+    /// Why the last session did not start or stopped (the debug screen, a long press on the start screen).
+    @Published private(set) var lastError: String?
     /// A session runs and no reading has come yet.
     var measuring: Bool { running && heartRate == nil }
 
@@ -126,6 +130,7 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
         } catch {
             session = nil
             builder = nil
+            lastError = error.localizedDescription
         }
     }
 
@@ -270,7 +275,7 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
     func workoutSession(_ workoutSession: HKWorkoutSession, didChangeTo toState: HKWorkoutSessionState, from fromState: HKWorkoutSessionState, date: Date) {}
 
     func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {
-        DispatchQueue.main.async { self.running = false }
+        DispatchQueue.main.async { self.running = false; self.lastError = error.localizedDescription }
     }
 
     func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {}

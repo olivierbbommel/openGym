@@ -677,7 +677,10 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
                 self?.restStartedAt = nil
             }
         }
-        guard notify, !isDemo else { return }
+        // With a workout session running the watch keeps the app in front and the timer above ends
+        // the rest with its own tap on the wrist, as Apple's Workout app does. A notification on top
+        // of that sent the watch to the watch face once it was dismissed, and the workout looked closed.
+        guard notify, !isDemo, !health.running else { return }
         let content = UNMutableNotificationContent()
         content.title = L("Rest’s over. Next set!")
         if let e = entry, let si = setIndex {
@@ -925,7 +928,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     /// What the phone's Settings → Apple Watch shows about this watch.
     func sendStatus() {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
-        send(event: ["id": UUID().uuidString, "type": "watchStatus", "health": health.status, "version": version,
+        send(event: ["id": UUID().uuidString, "type": "watchStatus", "health": health.status, "session": health.running, "version": version,
                      "clips": libraryIndex, "at": Date().timeIntervalSince1970 * 1000])
     }
 

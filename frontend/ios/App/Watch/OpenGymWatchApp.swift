@@ -1394,6 +1394,7 @@ struct DebugView: View {
                 Text(verbatim: "started here: \(store.state.startedHere ?? "-")").font(.caption2)
                 Text(verbatim: "clips: \(store.clips.count)").font(.caption2)
                 Text(verbatim: "health: \(store.health.enabled ? "on" : "off"), \(store.health.running ? "running" : "idle")").font(.caption2)
+                if let e = store.health.lastError { Text(verbatim: "session error: \(e)").font(.caption2).foregroundStyle(.orange) }
                 Divider()
                 ForEach(Array(store.clipLog.reversed().enumerated()), id: \.offset) { pair in
                     Text(verbatim: pair.element).font(.system(size: 10)).foregroundStyle(.secondary)
