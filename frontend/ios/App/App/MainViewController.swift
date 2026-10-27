@@ -34,6 +34,7 @@ class MainViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(WidgetBridgePlugin())
         bridge?.registerPluginInstance(LiveActivityPlugin())
         WidgetPreview.runIfAsked()
+        hideFormAccessoryBar()
         loadObservation = webView?.observe(\.isLoading, options: [.new]) { [weak self] web, _ in
             guard !web.isLoading else { return }
             DispatchQueue.main.async { self?.sentInsets = nil; self?.passReservedRegions() }
@@ -47,6 +48,33 @@ class MainViewController: CAPBridgeViewController {
         if ProcessInfo.processInfo.arguments.contains(MainViewController.pendingProbeArgument) {
             DispatchQueue.main.async { [weak self] in self?.showPendingProbe() }
         }
+    }
+
+    /* ---------- the keyboard without the form bar ---------- */
+
+    /**
+     * Over the keyboard WebKit puts its form bar (previous, next and a checkmark), which the app
+     * has no use for: every screen has one field at a time and its own Done. On the folded iPhone
+     * Duo it covered the Coach's message box. The web view's content view is given a subclass of
+     * its own class that answers no accessory view (what Capacitor's Keyboard plugin does for
+     * setAccessoryBarVisible(false), without adding the plugin).
+     */
+    private func hideFormAccessoryBar() {
+        guard let content = webView?.scrollView.subviews.first(where: { String(describing: type(of: $0)).hasPrefix("WKContent") }) else { return }
+        let base: AnyClass = type(of: content)
+        let name = String(describing: base) + "_OliGymNoAccessory"
+        if base.description() == name { return }
+        var cls: AnyClass? = NSClassFromString(name)
+        if cls == nil, let made = objc_allocateClassPair(base, name, 0) {
+            let sel = #selector(getter: UIResponder.inputAccessoryView)
+            let none: @convention(block) (AnyObject) -> UIView? = { _ in nil }
+            if let m = class_getInstanceMethod(UIResponder.self, sel) {
+                class_addMethod(made, sel, imp_implementationWithBlock(none), method_getTypeEncoding(m))
+            }
+            objc_registerClassPair(made)
+            cls = made
+        }
+        if let cls = cls { object_setClass(content, cls) }
     }
 
     /* ---------- the iPhone Duo's reserved regions ---------- */

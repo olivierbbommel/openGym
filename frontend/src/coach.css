@@ -170,6 +170,9 @@
 /* The Android app reports the keyboard instead of shrinking the page (lib/native-keyboard.js):
    the composer rides on top of it. */
 :root[data-native-kb] .composer{bottom:var(--native-kb);padding-bottom:10px}
+/* The iPhone: what the keyboard covers of the page (CoachChat measures it from the visual viewport,
+   as the sheets do), so the composer stands on the keyboard rather than behind it. */
+.composer{bottom:var(--kb-bottom,0px)}
 /* The iPhone's keyboard: the composer sits on it, and the home indicator's strip is under the
    keys, so its padding would only leave a band between the box and the keyboard. */
 .composer:has(textarea:focus){padding-bottom:8px}

@@ -33,6 +33,7 @@ import { insightsFor, sessionInsights } from '../lib/coach-insights.js'
 import { useCoachStatus, requestReview, requestDebrief, requestPlan, refinePlan, resolvePending, cohortStats, setCohortShare, jobErrorText, NO_CONNECTION, awaitedJob, settleAwaited, JOB_ERRORS, ensureAiConsent, isDeclined } from '../lib/coach-api.js'
 import { AiConsentSection } from '../components/CoachConsentSheet.jsx'
 import { useCoachGate } from '../lib/use-coach-gate.js'
+import { sheetKeyboardInsets } from '../lib/use-sheet-keyboard.js'
 import { confirmSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import { glyphOf } from '../lib/glyphs.js'
@@ -127,9 +128,15 @@ export default function CoachChat() {
     const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null
     ro?.observe(el)
     const vv = window.visualViewport
-    const onKb = () => setTimeout(toEnd, 50)
+    // What the keyboard covers (lib/use-sheet-keyboard.js, as the sheets measure it): the composer
+    // stands on it. Then the last message is brought back into view above it.
+    const onKb = () => {
+      el.style.setProperty('--kb-bottom', sheetKeyboardInsets(window).bottomInset + 'px')
+      setTimeout(toEnd, 50)
+    }
     vv?.addEventListener('resize', onKb)
-    return () => { ro?.disconnect(); vv?.removeEventListener('resize', onKb) }
+    vv?.addEventListener('scroll', onKb)
+    return () => { ro?.disconnect(); vv?.removeEventListener('resize', onKb); vv?.removeEventListener('scroll', onKb) }
   })
 
 
