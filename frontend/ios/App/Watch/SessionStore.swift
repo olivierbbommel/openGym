@@ -959,6 +959,11 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         }
         if screen != "empty" { apply(json: json) }
         DispatchQueue.main.async {
+            // The screenshots with a long exercise name (how it wraps inside the rest ring).
+            if ProcessInfo.processInfo.arguments.contains("-OpenGymWatchDemoLongName"), var w = self.state.workout, !w.entries.isEmpty {
+                w.entries[0].name = "Cable Lat Pulldown (Full Range, Wide Grip)"
+                self.state.workout = w
+            }
             switch screen {
             case "set", "weight", "rest", "offline", "edit-weight", "edit-reps", "actions", "howto": self.picked[0] = 2
             case "effort", "edit-effort":

@@ -195,6 +195,37 @@ struct EdgeButton: View {
     }
 }
 
+/// A button of the bottom bar (the system places it in the display's corner, inside its rounding).
+struct BarButton: View {
+    let systemImage: String
+    let label: Text
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage).font(.system(size: 17, weight: .semibold)).foregroundStyle(.white)
+        }
+        // Grey, as the app's round buttons are: the bar would fill it with the accent green.
+        .tint(Theme.dim)
+        .accessibilityLabel(label)
+    }
+}
+
+/// What sits inside a ring: the square inscribed in its circle (side × 1/√2), less the ring's
+/// width, so a long exercise name wraps inside the ring instead of running over it.
+struct InsideRing<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        GeometryReader { g in
+            let side = max(0, min(g.size.width, g.size.height) * 0.7071 - 10)
+            VStack(spacing: 1) { content }
+                .frame(width: side, height: side)
+                .position(x: g.size.width / 2, y: g.size.height / 2)
+        }
+    }
+}
+
 /* ---------- no workout: start one ---------- */
 
 struct IdleView: View {
@@ -1112,13 +1143,15 @@ struct RestView: View {
 
     var body: some View {
         // The ring and the countdown in it take the space above the two corner buttons, so nothing
-        // overlaps on any size (it did on 46 mm when the ring filled the whole screen).
-        VStack(spacing: 2) {
+        // overlaps on any size (it did on 46 mm when the ring filled the whole screen). The buttons
+        // are the system's bottom bar: it puts them inside the rounded corners of every display
+        // (they were cut off by the Ultra's).
+        NavigationStack {
             ZStack {
                 if store.show.restRing {
                     CountdownRing(start: store.restStartedAt ?? end.addingTimeInterval(-90), end: end)
                 }
-                VStack(spacing: 1) {
+                InsideRing {
                     Text("Rest").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                     Text(timerInterval: Date()...end, countsDown: true)
                         .font(.system(size: store.show.restRing ? countdownSize : countdownSize * 1.35, weight: .semibold, design: .rounded).monospacedDigit())
@@ -1147,19 +1180,20 @@ struct RestView: View {
                             .minimumScaleFactor(0.6)
                     }
                 }
-                .padding(.horizontal, 18)
             }
             .aspectRatio(1, contentMode: .fit)
             .padding(.horizontal, 6)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             // Always On: the countdown stays, the buttons go (nothing to tap with the wrist down).
-            HStack {
-                EdgeButton(systemImage: "goforward.15", label: Text("+15s")) { store.addRest(15) }
-                Spacer()
-                EdgeButton(systemImage: "forward.end.fill", label: Text("Skip")) { store.skipRest() }
+            .toolbar {
+                ToolbarItemGroup(placement: .bottomBar) {
+                    BarButton(systemImage: "goforward.15", label: Text("+15s")) { store.addRest(15) }
+                    Spacer()
+                    BarButton(systemImage: "forward.end.fill", label: Text("Skip")) { store.skipRest() }
+                }
             }
-            .opacity(dimmed ? 0 : 1)
+            .toolbar(dimmed ? .hidden : .visible, for: .bottomBar)
         }
-        .ignoresSafeArea(edges: .bottom)
         .dynamicTypeSize(...DynamicTypeSize.accessibility2)
     }
 }
@@ -1172,10 +1206,10 @@ struct HoldView: View {
     @ScaledMetric(relativeTo: .largeTitle) private var countdownSize: CGFloat = 42
 
     var body: some View {
-        VStack(spacing: 2) {
+        NavigationStack {
             ZStack {
                 CountdownRing(start: store.holdStartedAt ?? end, end: end, color: .cyan)
-                VStack(spacing: 1) {
+                InsideRing {
                     Text(store.entry?.name ?? "").font(.caption2.weight(.semibold)).foregroundStyle(.secondary).lineLimit(1)
                     Text(timerInterval: Date()...end, countsDown: true)
                         .font(.system(size: countdownSize, weight: .semibold, design: .rounded).monospacedDigit())
@@ -1184,17 +1218,18 @@ struct HoldView: View {
                         .multilineTextAlignment(.center)
                     Text("Hold").font(.caption2).foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 18)
             }
             .aspectRatio(1, contentMode: .fit)
             .padding(.horizontal, 6)
-            HStack {
-                Spacer()
-                EdgeButton(systemImage: "stop.fill", label: Text("Stop")) { store.endHold(early: true) }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .toolbar {
+                ToolbarItemGroup(placement: .bottomBar) {
+                    Spacer()
+                    BarButton(systemImage: "stop.fill", label: Text("Stop")) { store.endHold(early: true) }
+                }
             }
-            .opacity(dimmed ? 0 : 1)
+            .toolbar(dimmed ? .hidden : .visible, for: .bottomBar)
         }
-        .ignoresSafeArea(edges: .bottom)
         .dynamicTypeSize(...DynamicTypeSize.accessibility2)
     }
 }
