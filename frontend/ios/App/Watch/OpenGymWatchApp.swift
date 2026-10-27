@@ -396,7 +396,7 @@ struct ExercisePage: View {
                     .padding(.top, 1)
                     .dynamicTypeSize(...DynamicTypeSize.large)
                     Spacer(minLength: 2)
-                    primaryButton(entry, current: current)
+                    bottomRow(entry, center: primaryButton(entry, current: current))
                     Spacer(minLength: 3)
                     SetDots(entry: entry, current: si, skipped: { store.isSkipped(entry.id, $0) }) { store.pick(set: $0, in: index) }
                 } else {
@@ -411,6 +411,7 @@ struct ExercisePage: View {
                         .multilineTextAlignment(.center)
                         .minimumScaleFactor(0.7)
                     Spacer(minLength: 4)
+                    bottomRow(entry, center: Color.clear.frame(width: 1, height: 1))
                     SetDots(entry: entry, current: nil, skipped: { store.isSkipped(entry.id, $0) }) { store.pick(set: $0, in: index) }
                 }
             }
@@ -484,45 +485,71 @@ struct ExercisePage: View {
         }
     }
 
+    /// The top row: the exercise's name, clear of the clock (the system draws it in the top
+    /// right, over whatever sits there); under it the heart rate, the offline sign and the
+    /// clock or calories the phone's Settings ask for. The animation and the ⋯ sit at the bottom,
+    /// either side of Done (bottomRow), where they no longer squeeze the name or meet the clock.
     @ViewBuilder private func header(_ entry: Entry) -> some View {
-        HStack(alignment: .top, spacing: 6) {
-            // The animation and the name open How to do it: the animation large (kept on the watch).
-            HStack(alignment: .top, spacing: 6) {
-                if store.show.showClip, let clip = store.clip(for: entry.id) {
-                    ClipView(clip: clip, animating: index == store.entryIndex).frame(width: 30, height: 30)
-                }
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(entry.name)
-                        .font(.system(.footnote, design: .rounded).weight(.semibold))
-                        // One line at the large sizes (shrunk to fit): two would push the page up into the clock.
-                        .lineLimit(typeSize.isAccessibilitySize ? 1 : 2)
-                        .minimumScaleFactor(typeSize.isAccessibilitySize ? 0.6 : 0.8)
-                        .fixedSize(horizontal: false, vertical: true)
-                    WorkoutExtras()
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 1) {
+            Text(entry.name)
+                .font(.system(.footnote, design: .rounded).weight(.semibold))
+                // One line at the large sizes (shrunk to fit): two would push the page down too far.
+                .lineLimit(typeSize.isAccessibilitySize ? 1 : 2)
+                .minimumScaleFactor(typeSize.isAccessibilitySize ? 0.6 : 0.8)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.trailing, clockClearance)
+                .contentShape(Rectangle())
+                .onTapGesture { howTo = true }
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint(Text("How to do it"))
+            HStack(spacing: 6) {
+                if store.show.showHr { HeartRateBadge(health: store.health) }
+                OfflineSign()
+                WorkoutExtras()
             }
-            .contentShape(Rectangle())
-            .onTapGesture { howTo = true }
-            .accessibilityAddTraits(.isButton)
-            .accessibilityHint(Text("How to do it"))
-            OfflineSign()
-            if store.show.showHr { HeartRateBadge(health: store.health) }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        // The top row sits just under the clock: it grows less than the numbers do.
+        .dynamicTypeSize(...DynamicTypeSize.xLarge)
+    }
+
+    /// The room the system's clock takes in the top right (its digits and the status icons beside it).
+    private var clockClearance: CGFloat { 56 }
+
+    /// Done in the middle, the exercise's animation on its left (a tap opens How to do it) and its
+    /// ⋯ on its right: the same width each side, so Done stays in the middle with or without one.
+    @ViewBuilder private func bottomRow(_ entry: Entry, center: some View) -> some View {
+        HStack(alignment: .center, spacing: 0) {
+            Group {
+                if store.show.showClip, let clip = store.clip(for: entry.id) {
+                    Button { howTo = true } label: {
+                        ClipView(clip: clip, animating: index == store.entryIndex)
+                            .frame(width: 34, height: 34)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text("How to do it"))
+                } else { Color.clear }
+            }
+            .frame(width: sideSlot, height: sideSlot)
+            Spacer(minLength: 2)
+            center
+            Spacer(minLength: 2)
             Button { actions = true } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 26, height: 26)
-                    .background(Circle().fill(Theme.dim))
                     .frame(width: 32, height: 32)
+                    .background(Circle().fill(Theme.dim))
+                    .frame(width: sideSlot, height: sideSlot)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text("More"))
         }
-        // The top row sits just under the clock: it grows less than the numbers do.
-        .dynamicTypeSize(...DynamicTypeSize.xLarge)
     }
+
+    private var sideSlot: CGFloat { 40 }
 
     /// Warm-up, the side up next, superset: what kind of set this is, above the numbers.
     @ViewBuilder private func tags(_ entry: Entry, _ row: SetRow) -> some View {
