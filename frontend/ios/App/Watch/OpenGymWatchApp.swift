@@ -840,7 +840,7 @@ struct ValueEditor: View {
                 .frame(maxWidth: .infinity)
                 .focusable()
                 .focused($focused)
-                .digitalCrownRotation($value, from: range.lowerBound, through: range.upperBound, by: step,
+                .digitalCrownRotation($value, from: range.lowerBound, through: range.upperBound, by: field == .weight ? WeightStep.crown : step,
                                       sensitivity: field == .weight ? DigitalCrownRotationalSensitivity.medium : DigitalCrownRotationalSensitivity.low, isContinuous: false, isHapticFeedbackEnabled: true)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(title)
@@ -888,15 +888,18 @@ struct ValueEditor: View {
     }
 
     private func nudge(_ d: Double) {
-        // On the step's grid, so + and − land on the same numbers the crown does.
-        let next = ((value + d) / step).rounded() * step
-        value = min(range.upperBound, max(range.lowerBound, next))
+        // A weight jumps by the exercise's step from wherever the crown left it (62.3 → 64.8);
+        // the rest stay on their step's grid.
+        if field == .weight { value = WeightStep.nudge(value, by: d, in: range) } else {
+            let next = ((value + d) / step).rounded() * step
+            value = min(range.upperBound, max(range.lowerBound, next))
+        }
         WKInterfaceDevice.current().play(.click)
     }
 
     private func save() {
         switch field {
-        case .weight: store.weight = max(0, value)
+        case .weight: store.weight = WeightStep.clean(max(0, value))
         case .reps: store.reps = max(0, value.rounded())
         case .seconds: store.seconds = max(5, value)
         case .minutes: store.minutes = max(1, value.rounded())
