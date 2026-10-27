@@ -31,9 +31,11 @@ import { t, getLang } from './i18n.js'
 
 export const ADAPTERS = { anthropic, openai, gemini, compatible }
 export const LOCAL_DAILY_CAP = 10
-// Five minutes is right for a cloud API and wrong for a model on somebody's laptop; the
-// OpenAI-compatible endpoint is the one that may be local, so it gets the long budget.
-export const TIMEOUT_MS = 5 * 60000
+// A cloud model writing a whole plan: up to MAX_OUTPUT_TOKENS (16,000) in one answer, which at a
+// large model's pace is over five minutes, so five minutes gave up on answers that were coming.
+// A model on somebody's laptop is slower still: the OpenAI-compatible endpoint is the one that
+// may be local, so it gets the long budget.
+export const TIMEOUT_MS = 12 * 60000
 export const LOCAL_ENDPOINT_TIMEOUT_MS = 25 * 60000
 export const timeoutFor = provider => (provider === 'compatible' ? LOCAL_ENDPOINT_TIMEOUT_MS : TIMEOUT_MS)
 const PENDING_DAYS = 14

@@ -204,5 +204,7 @@ describe('timeouts on the phone', () => {
     expect(timeoutFor('compatible')).toBe(LOCAL_ENDPOINT_TIMEOUT_MS)
     expect(LOCAL_ENDPOINT_TIMEOUT_MS).toBeGreaterThanOrEqual(20 * 60000)
     for (const p of ['anthropic', 'openai', 'gemini']) expect(timeoutFor(p)).toBe(TIMEOUT_MS)
+    // A full plan at a large model's pace: 16,000 tokens take longer than five minutes.
+    expect(TIMEOUT_MS).toBeGreaterThanOrEqual(10 * 60000)
   })
 })
