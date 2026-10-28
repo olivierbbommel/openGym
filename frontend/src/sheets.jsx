@@ -58,6 +58,7 @@ import { workoutFit, fitFileName } from './lib/fit-export.js'
 import { joinSessionNoProg } from './lib/session-noprog.js'
 import { buildCombinedEntries, deriveSessionName } from './lib/session-merge.js'
 import { workoutsOn, backfillStart, backfillEnd, completeBackfill, historyAsOf, sessionHistory } from './lib/backfill.js'
+import { DESCRIPTION_MAX } from './lib/voice-log.js'
 import { moveWorkout, sameWorkout, startTimeOf, durationMinOf, setWorkoutDuration, rebuildPrHistory, MAX_DURATION_MIN, endsInFuture } from './lib/workout-date.js'
 import { editCompletedSession, editLeftEmpty, editedRecord, editChangesNothing } from './lib/session-edit.js'
 import { stampWorkout } from './lib/sync-merge.js'
@@ -3020,6 +3021,12 @@ function LogPastWorkout({ initial, close }) {
   const [time, setTime] = useState('18:00')
   const [dur, setDur] = useState(60)
   const [routineId, setRoutineId] = useState(planned.length > 1 ? PLANNED_DAY : planned[0]?.id || '')
+  // Log by voice: what was done, said into the keyboard's microphone (or typed). When there is
+  // any, Continue has a model read it into the session instead of opening a routine.
+  const [desc, setDesc] = useState('')
+  const [reading, setReading] = useState(false)
+  const [canRead, setCanRead] = useState(false)
+  useEffect(() => { let live = true; import('./lib/voice-log-ai.js').then(m => m.voiceLogReady()).then(ok => { if (live) setCanRead(ok) }).catch(() => {}); return () => { live = false } }, [])
   const today = todayISO()
   const options = [
     { value: '', label: t('Freestyle') },
@@ -3027,12 +3034,25 @@ function LogPastWorkout({ initial, close }) {
     ...st.routines.map(r => ({ value: r.id, label: r.name })),
   ]
 
-  const go = replaceId => {
+  const go = async replaceId => {
+    if (desc.trim()) {
+      setReading(true)
+      let read
+      try {
+        const m = await import('./lib/voice-log-ai.js')
+        read = await m.readDescription(S(), desc.trim())
+      } catch (e) { setReading(false); toast(String(e?.message || e)); return }
+      setReading(false)
+      close()
+      beginBackfill({ iso: date, time, durationMin: Math.max(1, dur), routineIds: [], replaceId, read })
+      return
+    }
     close()
     const routineIds = routineId === PLANNED_DAY ? planned.map(r => r.id) : routineId ? [routineId] : []
     beginBackfill({ iso: date, time, durationMin: Math.max(1, dur), routineIds, replaceId })
   }
   const submit = () => {
+    if (reading) return
     if (!date || date > today) { toast(t('Pick a day up to today')); return }
     if (!(dur >= 1)) { toast(t('Enter how long it took (at least 1 minute).')); return }
     if (dur > MAX_DURATION_MIN) { toast(t('That’s more than a day. Keep it to 24 hours or less.')); return }
@@ -3054,9 +3074,17 @@ function LogPastWorkout({ initial, close }) {
     {!(dur >= 1) && <div className="small" style={{ color: 'var(--red)', marginTop: 6 }}>{t('Enter how long it took (at least 1 minute).')}</div>}
     {dur > MAX_DURATION_MIN && <div className="small" style={{ color: 'var(--red)', marginTop: 6 }}>{t('That’s more than a day. Keep it to 24 hours or less.')}</div>}
     <div style={{ height: 8 }} />
-    <SelectRow icon="dumbbell" title={t('Routine')} value={routineId} options={options} onChange={setRoutineId} />
+    {!desc.trim() && <SelectRow icon="dumbbell" title={t('Routine')} value={routineId} options={options} onChange={setRoutineId} />}
+    {canRead && <>
+      <div style={{ height: 14 }} />
+      <div className="small" style={{ fontWeight: 600, marginBottom: 6 }}>{t('Or say what you did')}</div>
+      <textarea className="input voice-log-desc" rows={5} maxLength={DESCRIPTION_MAX} value={desc} disabled={reading}
+        placeholder={t('Tap the microphone on the keyboard and talk: “Four rounds of a 10 second pull-up hold, 6 pull-ups with the yellow band and 8 pike push-ups. Then 4 dips with a 5 second pause, 4 times…”')}
+        onChange={e => setDesc(e.target.value)} />
+      <div className="muted small" style={{ marginTop: 6 }}>{t('Claude Haiku reads it into the workout, with your Coach key. You check it before saving.')}</div>
+    </>}
     <div style={{ height: 18 }} />
-    <Button variant="primary" onClick={submit}>{t('Continue')}</Button>
+    <Button variant="primary" onClick={submit} disabled={reading}>{reading ? t('Reading it…') : desc.trim() ? t('Read it') : t('Continue')}</Button>
   </>
 }
 // Three ways out when the day already has a workout. Replacing with several on that day means
@@ -3090,24 +3118,34 @@ export function logPastWorkoutSheet(initial) {
 // top-level routineId. One routine from the picker, or every routine of a missed combined day.
 // Only from the history before that day (historyAsOf): a session logged later must not hand its
 // progression back to the day it skipped.
-function beginBackfill({ iso, time, durationMin, routineIds, replaceId }) {
+// `read` is a session read from a description (Log by voice, lib/voice-log.js): its entries,
+// already done, take the place of a routine's, for checking on the workout screen before saving.
+function beginBackfill({ iso, time, durationMin, routineIds, replaceId, read = null }) {
   const st = S()
   const start = backfillStart(iso, time)
   const past = historyAsOf(st, { d: iso, start, replaceId })
-  const { entries, routineIds: rids, routines } = buildCombinedEntries(past, routineIds || [])
+  const { entries, routineIds: rids, routines } = read
+    ? { entries: read.entries, routineIds: [], routines: [] }
+    : buildCombinedEntries(past, routineIds || [])
   update(s => {
     s.active = {
       id: uid(), d: iso, start,
       routineIds: rids,
-      name: routines.length ? deriveSessionName(routines.map(r => r.name)) : t('Freestyle'),
+      name: read?.name || (routines.length ? deriveSessionName(routines.map(r => r.name)) : t('Freestyle')),
+      ...(read?.name ? { customName: true } : {}),
       bw: null, cur: 0, entries,
-      backfill: { durationMin, replaceId: replaceId || null },
+      backfill: { durationMin: read?.durationMin || durationMin, replaceId: replaceId || null },
       // Same layout snapshot as a live session (see beginWorkout).
       workoutView: st.workoutView || 'cards',
     }
   })
   useUI.getState().stopRest()
   navToWorkout()
+  if (read) {
+    const left = [...read.unmatched]
+    if (left.length) toast(t('Not found, add by hand: {0}', left.join(', ')))
+    else toast(t('Check it over, then finish to save.'))
+  }
 }
 
 /* ============================ add a routine mid-session ============================ */
