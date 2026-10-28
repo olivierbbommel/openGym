@@ -627,13 +627,39 @@ const storeReady = () => getStateRef?.()?.ready !== false
  * Takes what the watch sent from the native queue, applies it, and acknowledges what is done, but
  * only once the change is on disk (the store's saveNow): the queue is the event's last copy.
  */
+// A call to the native side that never answers: one made as iOS suspended the page (the phone in a
+// pocket) can lose its reply. Without a bound, `draining` stayed pending for good and every later
+// drain waited on it: nothing the watch sent was applied again until the app was relaunched.
+export const BRIDGE_TIMEOUT_MS = 8000
+const bounded = (promise, ms = BRIDGE_TIMEOUT_MS) => Promise.race([
+  promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+])
+
+/**
+ * The workout running here whose id is a saved workout's already: it was finished elsewhere (the
+ * watch's Finish, applied from the server's inbox; another device). Its id, or null. A saved
+ * workout being edited (`editingWorkoutId`) carries its own id on purpose and is not one.
+ */
+export function endedElsewhere (S) {
+  const A = S?.active
+  if (!A || !A.id || A.editingWorkoutId) return null
+  return (Array.isArray(S.workouts) ? S.workouts : []).some(w => w && w.id === A.id) ? A.id : null
+}
+
+/** Ends the workout running here when it was already saved elsewhere (the app's own Discard: nothing saved twice). */
+export function reconcileActive (S = getStateRef?.()?.S) {
+  const id = endedElsewhere(S)
+  if (id && appHandlers?.discard) appHandlers.discard(id)
+  return id
+}
+
 export function drainWatchEvents () {
   if (draining) return draining
   draining = (async () => {
     try {
       const p = await watchPlugin()
       if (!getStateRef || !storeReady()) return []
-      const { events = [] } = (p && (await p.WatchBridge.drain())) || {}
+      const { events = [] } = (p && (await bounded(p.WatchBridge.drain()))) || {}
       // The same events by way of the server (the phone was at home, lib/watch-inbox.js): those the
       // native queue does not have, after it. What another device applied counts as done.
       const S = getStateRef()?.S
@@ -647,7 +673,9 @@ export function drainWatchEvents () {
       if (fromInbox.length) getStateRef()?.update?.(s => { markInboxDone(s, fromInbox) })
       if (done.length) await getStateRef()?.saveNow?.()
       const native = done.filter(id => own.has(id))
-      if (p && native.length) await p.WatchBridge.ack({ ids: native })
+      if (p && native.length) await bounded(p.WatchBridge.ack({ ids: native }))
+      // The watch's Finish, applied here or saved by another device: no workout left running here.
+      reconcileActive(getStateRef()?.S)
       return done
     } catch { return [] } finally { draining = null }
   })()
@@ -846,6 +874,8 @@ export async function startWatchSync ({ useStore, useUI }) {
     if (s.S === prev.S) return
     // The server's copy brought events the watch wrote there: applied now, as the queue's are.
     if (s.S?.watchInbox !== prev.S?.watchInbox && s.S?.watchInbox?.length) drainWatchEvents()
+    // The workout running here came back saved (finished on the watch or elsewhere): it ends here.
+    if (s.S?.workouts !== prev.S?.workouts) reconcileActive(s.S)
     schedule()
     // A workout started on the phone: the watch app opens with it (HealthKit's startWatchApp).
     if (linked && shouldOpenOnWatch(prev.S?.active, s.S?.active)) Promise.resolve().then(() => p.WatchBridge.openOnWatch()).catch(() => {})
@@ -879,6 +909,7 @@ export function startInboxSync ({ useStore }) {
   const off = useStore.subscribe((s, prev) => {
     if (s.ready && !prev.ready) drainWatchEvents()
     else if (s.S !== prev.S && s.S?.watchInbox !== prev.S?.watchInbox && s.S?.watchInbox?.length) drainWatchEvents()
+    if (s.S !== prev.S && s.S?.workouts !== prev.S?.workouts) reconcileActive(s.S)
   })
   drainWatchEvents()
   return () => { off(); getStateRef = null }
