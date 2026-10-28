@@ -104,7 +104,12 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
         wanted = true
         if let wid = wid { workoutId = wid }
         // Already running (opened by the phone before its workout arrived): only the id to add.
-        if session != nil { tag(); return }
+        // A session that failed or was ended by the system (another workout app took the sensors,
+        // Apple's Workout app for a gym machine) is no session: it is dropped and a new one starts.
+        if let s = session {
+            if [HKWorkoutSessionState.running, .prepared, .paused, .notStarted].contains(s.state) { tag(); return }
+            drop()
+        }
         guard enabled, HKHealthStore.isHealthDataAvailable() else { return }
         let config = HKWorkoutConfiguration()
         config.activityType = .traditionalStrengthTraining
@@ -272,10 +277,39 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
 
     /* ---------- delegates ---------- */
 
-    func workoutSession(_ workoutSession: HKWorkoutSession, didChangeTo toState: HKWorkoutSessionState, from fromState: HKWorkoutSessionState, date: Date) {}
+    func workoutSession(_ workoutSession: HKWorkoutSession, didChangeTo toState: HKWorkoutSessionState, from fromState: HKWorkoutSessionState, date: Date) {
+        // Ended by the system, not by end(): this object is spent. Left in place, it made every
+        // later start() take it for a running session, and no workout was measured (or kept the
+        // app in front) until the app was relaunched. The next start() (resume()) begins a new one.
+        guard toState == .ended || toState == .stopped else { return }
+        DispatchQueue.main.async {
+            guard self.session === workoutSession else { return }
+            self.lastError = "the session was ended by watchOS"
+            self.drop()
+        }
+    }
 
     func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {
-        DispatchQueue.main.async { self.running = false; self.lastError = error.localizedDescription }
+        DispatchQueue.main.async {
+            self.lastError = error.localizedDescription
+            if self.session === workoutSession { self.drop() } else { self.running = false }
+        }
+    }
+
+    /// A session that is no more: forgotten, its readings kept for the sets already measured.
+    private func drop() {
+        if let q = query { store.stop(q); query = nil }
+        session = nil
+        builder = nil
+        tagged = nil
+        running = false
+    }
+
+    /// The app is back in front with a workout that should be measured and no session running
+    /// (it failed, or watchOS ended it while another workout app ran): a new one starts.
+    func resume(workoutId wid: String?) {
+        guard wanted || wid != nil, enabled, session == nil else { return }
+        start(workoutId: wid)
     }
 
     func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {}

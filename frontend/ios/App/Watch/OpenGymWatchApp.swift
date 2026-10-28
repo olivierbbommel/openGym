@@ -47,6 +47,14 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate {
         store.openedForWorkout()
     }
 
+    /// Back in front with a workout running and no workout session (it failed to start, or watchOS
+    /// ended it while Apple's Workout app ran a gym machine): a new one starts, so the heart rate is
+    /// measured again and the app stays in front through the rests.
+    func applicationDidBecomeActive() {
+        guard let wid = store.state.workout?.id, !store.isDemo else { return }
+        store.health.resume(workoutId: wid)
+    }
+
     /// Relaunched after being killed mid-workout: the Apple Health session watchOS kept running.
     func handleActiveWorkoutRecovery() {
         store.health.recover(workoutId: store.state.workout?.id)
