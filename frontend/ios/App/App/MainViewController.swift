@@ -37,7 +37,7 @@ class MainViewController: CAPBridgeViewController {
         hideFormAccessoryBar()
         loadObservation = webView?.observe(\.isLoading, options: [.new]) { [weak self] web, _ in
             guard !web.isLoading else { return }
-            DispatchQueue.main.async { self?.sentInsets = nil; self?.passReservedRegions() }
+            DispatchQueue.main.async { self?.sentInsets = nil; self?.sentWidth = 0; self?.passReservedRegions(); self?.passWidth() }
         }
         // Switched while the app runs: the page follows at once.
         NotificationCenter.default.addObserver(forName: UIAccessibility.reduceTransparencyStatusDidChangeNotification,
@@ -87,6 +87,28 @@ class MainViewController: CAPBridgeViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         passReservedRegions()
+        passWidth()
+    }
+
+    /// The width last given to the page's viewport.
+    private var sentWidth: CGFloat = 0
+
+    /**
+     * The page lays out at the web view's real width. `width=device-width` is read from the screen
+     * the page was loaded on, and the iPhone Duo changes screens as it opens and closes: unfolded,
+     * the page kept the folded width, sat in a column on the left with its tab bar squeezed into it,
+     * and the rest of the screen was empty. Each new width is written into the viewport itself.
+     */
+    private func passWidth() {
+        guard let web = webView else { return }
+        let w = web.bounds.width.rounded()
+        guard w > 0, w != sentWidth else { return }
+        sentWidth = w
+        web.evaluateJavaScript(MainViewController.widthScript(Int(w)))
+    }
+
+    static func widthScript(_ w: Int) -> String {
+        "(function(){var m=document.querySelector('meta[name=viewport]');if(m)m.setAttribute('content','width=\(w),initial-scale=1,viewport-fit=cover,user-scalable=no')})()"
     }
 
     /**
@@ -100,9 +122,22 @@ class MainViewController: CAPBridgeViewController {
         guard #available(iOS 27.1, *), let web = webView else { return }
         let rects = web.reservedRegions(kind: .occlusion).filter { $0.isActive }.map { $0.frame }
         let insets = MainViewController.edgeInsets(of: rects, in: web.bounds)
-        guard insets != sentInsets else { return }
+        let below = MainViewController.rightTopExtent(of: rects, in: web.bounds)
+        guard insets != sentInsets || below != sentBelow else { return }
         sentInsets = insets
-        web.evaluateJavaScript(MainViewController.insetScript(insets))
+        sentBelow = below
+        web.evaluateJavaScript(MainViewController.insetScript(insets)
+            + ";document.documentElement.style.setProperty('--native-sar-top','\(Int(below.rounded(.up)))px')")
+    }
+
+    /// How far down a region in the top of the right edge reaches (the unfolded Duo held sideways
+    /// puts its status pill there): the side tab bar starts below it (index.css --native-sar-top).
+    private var sentBelow: CGFloat = -1
+    static func rightTopExtent(of rects: [CGRect], in bounds: CGRect) -> CGFloat {
+        rects.map { $0.intersection(bounds) }
+            .filter { !$0.isNull && $0.width > 0 && bounds.maxX - $0.maxX < 1 && $0.minY - bounds.minY < bounds.height / 3 }
+            .map { $0.maxY - bounds.minY }
+            .max() ?? 0
     }
 
     /// The inset each region asks of the edge it is nearest to, the largest per edge.

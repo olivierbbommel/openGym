@@ -2277,7 +2277,8 @@ button.wl-summary{width:100%;padding:0 0 10px;text-align:start;border-radius:var
   #tabbar{
     inset-inline-start:auto;inset-inline-end:auto;top:0;bottom:0;left:auto;right:0;width:var(--rail);
     flex-direction:column;justify-content:center;align-items:stretch;gap:4px;
-    padding:calc(var(--sat) + 8px) 0 calc(var(--sab) + 8px);
+    /* Below the status pill when it sits at the top of this edge (the unfolded Duo held sideways). */
+    padding:calc(max(var(--sat),var(--native-sar-top,0px)) + 8px) 0 calc(var(--sab) + 8px);
     border:none;border-left:var(--hair) solid var(--sep-op);
     transform:none;border-radius:0;box-shadow:none;   /* undo the floating bar of wider screens */
   }
