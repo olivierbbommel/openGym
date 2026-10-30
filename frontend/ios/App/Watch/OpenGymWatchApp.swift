@@ -835,6 +835,10 @@ struct ValueEditor: View {
     let entry: Entry
     let unit: String
     @State private var value: Double = 0
+    /// A weight: the crown's detents from `crownBase`, the weight when the crown last started from
+    /// it (opening, or a − or +), each a tenth (WatchCore WeightStep.fromTicks).
+    @State private var crownTicks: Double = 0
+    @State private var crownBase: Double = 0
     /// The effort was cleared (None): nothing is saved over it on the way out.
     @State private var cleared = false
     @FocusState private var focused: Bool
@@ -906,8 +910,9 @@ struct ValueEditor: View {
                 .frame(maxWidth: .infinity)
                 .focusable()
                 .focused($focused)
-                .digitalCrownRotation($value, from: range.lowerBound, through: range.upperBound, by: field == .weight ? WeightStep.crown : step,
-                                      sensitivity: field == .weight ? DigitalCrownRotationalSensitivity.medium : DigitalCrownRotationalSensitivity.low, isContinuous: false, isHapticFeedbackEnabled: true)
+                .digitalCrownRotation(crownBinding, from: field == .weight ? -WeightStep.crownSpan : range.lowerBound,
+                                      through: field == .weight ? WeightStep.crownSpan : range.upperBound, by: field == .weight ? 1 : step,
+                                      sensitivity: .low, isContinuous: false, isHapticFeedbackEnabled: true)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(title)
                 .accessibilityValue(Text(verbatim: suffix.map { "\(formatNumber(value)) \($0)" } ?? formatNumber(value)))
@@ -939,7 +944,10 @@ struct ValueEditor: View {
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .onAppear {
             switch field {
-            case .weight: value = store.weight
+            case .weight:
+                value = store.weight
+                crownBase = store.weight
+                crownTicks = 0
             case .reps: value = store.reps
             case .seconds: value = store.seconds
             case .minutes: value = store.minutes
@@ -953,10 +961,23 @@ struct ValueEditor: View {
         .onDisappear { save() }
     }
 
+    /// What the crown turns: the value itself, or for a weight its detents from crownBase.
+    private var crownBinding: Binding<Double> {
+        guard field == .weight else { return $value }
+        return Binding(get: { crownTicks }, set: { t in
+            crownTicks = t
+            value = WeightStep.fromTicks(crownBase, t, in: range)
+        })
+    }
+
     private func nudge(_ d: Double) {
         // A weight jumps by the exercise's step from wherever the crown left it (62.3 → 64.8);
         // the rest stay on their step's grid.
-        if field == .weight { value = WeightStep.nudge(value, by: d, in: range) } else {
+        if field == .weight {
+            value = WeightStep.nudge(value, by: d, in: range)
+            crownBase = value
+            crownTicks = 0
+        } else {
             let next = ((value + d) / step).rounded() * step
             value = min(range.upperBound, max(range.lowerBound, next))
         }
