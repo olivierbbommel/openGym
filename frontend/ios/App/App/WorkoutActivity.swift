@@ -157,6 +157,23 @@ enum LiveActivityTick {
             "id": UUID().uuidString, "type": "setDone", "wid": wid, "exId": exId,
             "entryIdx": entryIdx, "setIdx": setIdx, "at": (now.timeIntervalSince1970 * 1000).rounded(),
         ])
+        await move(activity, past: cur, now: now, bookRest: true)
+    }
+
+    /**
+     * A set done on the Apple Watch: the activity moves on as for its own Done, but nothing is
+     * queued for the page (the watch's event is in the watch's queue already, and the page applies
+     * it from there) and no rest alert is booked (the watch ends the rest on the wrist).
+     */
+    static func advance(wid: String, exId: String, entryIdx: Int, setIdx: Int, now: Date = Date()) async {
+        guard let activity = Activity<WorkoutActivityAttributes>.activities.first(where: { $0.attributes.wid == wid }) else { return }
+        let state = activity.content.state
+        guard let cur = state.cur, cur.exId == exId, cur.entryIdx == entryIdx, cur.setIdx == setIdx else { return }
+        await move(activity, past: cur, now: now, bookRest: false)
+    }
+
+    private static func move(_ activity: Activity<WorkoutActivityAttributes>, past cur: WorkoutActivityAttributes.SetInfo, now: Date, bookRest: Bool) async {
+        let state = activity.content.state
         var next = state
         next.cur = state.ahead.first
         next.ahead = Array(state.ahead.dropFirst())
@@ -166,7 +183,7 @@ enum LiveActivityTick {
             let end = now.addingTimeInterval(TimeInterval(cur.restAfter))
             next.restEndsAt = end.timeIntervalSince1970 * 1000
             next.restTotal = Double(cur.restAfter)
-            bookRestOver(at: end, title: activity.attributes.labels.restOver)
+            if bookRest { bookRestOver(at: end, title: activity.attributes.labels.restOver) }
         } else {
             next.restEndsAt = nil
             next.restTotal = nil

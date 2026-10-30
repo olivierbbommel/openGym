@@ -754,8 +754,22 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             outbox = Array((outbox + [json]).suffix(500))
             return
         }
-        // Queued by the system and delivered, in order, even when the phone app is not running.
-        session.transferUserInfo(["event": json, "tries": tries])
+        // The phone in reach: sent as a message, which arrives at once (and wakes the phone app in
+        // the background), so the phone and its Live Activity follow the set as it is done. Queued
+        // transfers wait for the system's own moment and arrived late. A message that does not
+        // arrive goes through the queue after all; the phone applies each event once, by its id.
+        if tries == 0, session.isReachable {
+            session.sendMessage(["event": json], replyHandler: nil) { [weak self] _ in
+                DispatchQueue.main.async { self?.queueTransfer(json, tries: tries) }
+            }
+            return
+        }
+        queueTransfer(json, tries: tries)
+    }
+
+    /// Queued by the system and delivered, in order, even when the phone app is not running.
+    private func queueTransfer(_ json: String, tries: Int) {
+        WCSession.default.transferUserInfo(["event": json, "tries": tries])
         updateLink()
     }
 

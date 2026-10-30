@@ -278,6 +278,15 @@ public class WatchBridgePlugin: CAPPlugin, CAPBridgedPlugin, WCSessionDelegate {
     /* ---------- the watch's side ---------- */
 
     public func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
+        receive(userInfo)
+    }
+
+    /// The same event sent as a message (the watch sends one while the phone is in reach).
+    public func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        receive(message)
+    }
+
+    private func receive(_ userInfo: [String: Any]) {
         guard let json = userInfo["event"] as? String,
               let data = json.data(using: .utf8),
               let event = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
@@ -291,6 +300,14 @@ public class WatchBridgePlugin: CAPPlugin, CAPBridgedPlugin, WCSessionDelegate {
                 events.append(event)
                 self.writeEvents(events)
             }
+        }
+        // The lock screen follows the set done at the wrist at once, in Swift: the page may be
+        // asleep in a pocket and apply it only when the app comes back (it then sets the same state).
+        if event["type"] as? String == "setDone", #available(iOS 17.0, *),
+           let wid = event["wid"] as? String, let exId = event["exId"] as? String,
+           let entryIdx = (event["entryIdx"] as? NSNumber)?.intValue, let setIdx = (event["setIdx"] as? NSNumber)?.intValue {
+            let at = ((event["at"] as? NSNumber)?.doubleValue).map { Date(timeIntervalSince1970: $0 / 1000) } ?? Date()
+            Task { await LiveActivityTick.advance(wid: wid, exId: exId, entryIdx: entryIdx, setIdx: setIdx, now: at) }
         }
         DispatchQueue.main.async { self.notifyListeners("watchEvent", data: event) }
     }
