@@ -99,16 +99,61 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
         b.addMetadata([HKMetadataKeySyncIdentifier: "opengym-w-\(wid)", HKMetadataKeySyncVersion: 1]) { _, _ in }
     }
 
-    /// A workout started here or picked up from the phone: the session starts now.
-    func start(workoutId wid: String? = nil) {
+    /* ---------- one workout session at a time (WatchCore SessionPolicy) ---------- */
+
+    private static let yieldedKey = "sessionYieldedFor"
+    /// The workout during which another app took the workout session (Apple's Workout app, a gym
+    /// machine): OliGym does not take it back for that workout. Kept across a relaunch.
+    @Published private(set) var yieldedFor: String? = UserDefaults.standard.string(forKey: WorkoutManager.yieldedKey) {
+        didSet { UserDefaults.standard.set(yieldedFor, forKey: WorkoutManager.yieldedKey) }
+    }
+    /// The running workout records in another app (the watch says so, and offers Record here).
+    var yielded: Bool { yieldedFor != nil && yieldedFor == workoutId }
+
+    private static let elsewhereKey = "recordElsewhere"
+    /// Let another app record (the ⋯ menu): Apple's Workout app records the workout (a gym machine
+    /// through it, say) and OliGym only logs the sets, reading the heart rate from Health. It never
+    /// starts a session then, unless asked to (Record here): watchOS gives no way to see another
+    /// app's session before ours would end it.
+    @Published var recordElsewhere: Bool = UserDefaults.standard.bool(forKey: WorkoutManager.elsewhereKey) {
+        didSet { UserDefaults.standard.set(recordElsewhere, forKey: WorkoutManager.elsewhereKey) }
+    }
+    /// No session of ours while a workout runs: another app records, or this one was asked not to.
+    var recordsElsewhere: Bool { wanted && !running && (yielded || recordElsewhere) }
+
+    private var live: Bool {
+        guard let s = session else { return false }
+        return [HKWorkoutSessionState.running, .prepared, .paused, .notStarted].contains(s.state)
+    }
+
+    /// A session lost: another app took it (the workout yields to it), or it failed on its own
+    /// (dropped, and started again when the app is next in front, as in build 14).
+    private func lost(_ how: SessionPolicy.Loss, _ message: String) {
+        lastError = message
+        let wid = workoutId
+        drop()
+        if SessionPolicy.yields(after: how, workoutRunning: wanted && wid != nil) {
+            yieldedFor = wid
+            // The other app's heart rate still reaches Health: read from there.
+            if enabled { startQuery(from: Date()) }
+        }
+    }
+
+    /// A workout started here or picked up from the phone: the session starts now, unless another
+    /// app records this workout already (SessionPolicy: only a new workout or Record here take
+    /// the session from it, never the app coming back to the front).
+    func start(workoutId wid: String? = nil, trigger: SessionPolicy.Trigger = .newWorkout) {
         wanted = true
         if let wid = wid { workoutId = wid }
+        if SessionPolicy.clearsYield(trigger) { yieldedFor = nil }
         // Already running (opened by the phone before its workout arrived): only the id to add.
-        // A session that failed or was ended by the system (another workout app took the sensors,
-        // Apple's Workout app for a gym machine) is no session: it is dropped and a new one starts.
-        if let s = session {
-            if [HKWorkoutSessionState.running, .prepared, .paused, .notStarted].contains(s.state) { tag(); return }
-            drop()
+        if live { tag(); return }
+        // A session that failed or was ended by the system is no session: dropped first.
+        if session != nil { drop() }
+        guard SessionPolicy.shouldStart(trigger, yielded: yielded, live: false, elsewhere: recordElsewhere) else {
+            // Another app records: its heart rate still reaches Health, read from there.
+            if enabled, query == nil { startQuery(from: Date()) }
+            return
         }
         guard enabled, HKHealthStore.isHealthDataAvailable() else { return }
         let config = HKWorkoutConfiguration()
@@ -136,6 +181,8 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
             session = nil
             builder = nil
             lastError = error.localizedDescription
+            // Another app records a workout right now: that one is left alone.
+            if (error as? HKError)?.code == .errorAnotherWorkoutSessionStarted, let wid = workoutId { yieldedFor = wid }
         }
     }
 
@@ -245,6 +292,7 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
     /// session's heart rate and calories (nothing when no session ran).
     func end(save: Bool, totals: ((Totals) -> Void)? = nil) {
         wanted = false
+        yieldedFor = nil
         workoutId = nil
         if let q = query { store.stop(q); query = nil }
         let all = samples.map { $0.1 }
@@ -281,18 +329,20 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
         // Ended by the system, not by end(): this object is spent. Left in place, it made every
         // later start() take it for a running session, and no workout was measured (or kept the
         // app in front) until the app was relaunched. The next start() (resume()) begins a new one.
+        // end() forgets the session before it ends, so one still ours here was ended by someone
+        // else: watchOS, for the workout another app started. OliGym yields for this workout.
         guard toState == .ended || toState == .stopped else { return }
         DispatchQueue.main.async {
             guard self.session === workoutSession else { return }
-            self.lastError = "the session was ended by watchOS"
-            self.drop()
+            self.lost(.anotherApp, "another app's workout took the session")
         }
     }
 
     func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {
+        let other = (error as? HKError)?.code == .errorAnotherWorkoutSessionStarted
         DispatchQueue.main.async {
-            self.lastError = error.localizedDescription
-            if self.session === workoutSession { self.drop() } else { self.running = false }
+            guard self.session === workoutSession else { self.running = false; return }
+            self.lost(other ? .anotherApp : .failed, error.localizedDescription)
         }
     }
 
@@ -308,8 +358,8 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
     /// The app is back in front with a workout that should be measured and no session running
     /// (it failed, or watchOS ended it while another workout app ran): a new one starts.
     func resume(workoutId wid: String?) {
-        guard wanted || wid != nil, enabled, session == nil else { return }
-        start(workoutId: wid)
+        guard wanted || wid != nil, enabled, !live else { return }
+        start(workoutId: wid, trigger: .activation)
     }
 
     func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {}

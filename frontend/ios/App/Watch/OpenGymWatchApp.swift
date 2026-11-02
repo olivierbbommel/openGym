@@ -514,6 +514,9 @@ struct ExercisePage: View {
                 if store.show.showHr { HeartRateBadge(health: store.health) }
                 OfflineSign()
                 WorkoutExtras()
+                if store.health.recordsElsewhere {
+                    Text("Recording in another app").font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -626,6 +629,15 @@ struct ExerciseActions: View {
                     }
                     if SessionCore.moved(w.entries, at: index, by: 1) != nil {
                         row("arrow.down", Text("Move down")) { store.moveExercise(index, by: 1) }
+                    }
+                    // One workout session at a time on the watch (WatchCore SessionPolicy): this
+                    // workout records here again only when asked, and Apple's Workout app can be
+                    // left to record every workout.
+                    if store.health.recordsElsewhere {
+                        row("record.circle", Text("Record here")) { store.health.start(workoutId: w.id, trigger: .recordHere) }
+                    }
+                    Toggle(isOn: Binding(get: { store.health.recordElsewhere }, set: { store.health.recordElsewhere = $0 })) {
+                        Text("Let another app record").font(.footnote)
                     }
                     NavigationLink { ValueEditor(field: .rest, entry: entry, unit: w.unit) } label: {
                         HStack {

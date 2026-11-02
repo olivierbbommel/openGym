@@ -48,6 +48,9 @@
 "Move down" = "เลื่อนลง";
 "The sets you logged in this session will be lost." = "เซ็ตที่บันทึกไว้ในรอบนี้จะหายไป";
 "Last time: %@" = "ครั้งก่อน: %@";
+"Record here" = "บันทึกที่นี่";
+"Let another app record" = "ให้แอปอื่นบันทึก";
+"Recording in another app" = "กำลังบันทึกในแอปอื่น";
 "Recent" = "ล่าสุด";
 "No workout running" = "ไม่มีการฝึกที่กำลังทำอยู่";
 "Start one on your iPhone and it shows up here." = "เริ่มบน iPhone แล้วจะแสดงที่นี่";

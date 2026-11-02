@@ -48,6 +48,9 @@
 "Move down" = "Переместить вниз";
 "The sets you logged in this session will be lost." = "Подходы, записанные в этой сессии, будут потеряны.";
 "Last time: %@" = "В прошлый раз: %@";
+"Record here" = "Записывать здесь";
+"Let another app record" = "Пусть записывает другое приложение";
+"Recording in another app" = "Записывается в другом приложении";
 "Recent" = "Недавние";
 "No workout running" = "Тренировка не идёт";
 "Start one on your iPhone and it shows up here." = "Начните её на iPhone, и она появится здесь.";

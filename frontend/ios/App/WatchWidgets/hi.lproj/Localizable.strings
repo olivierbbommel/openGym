@@ -48,6 +48,9 @@
 "Move down" = "नीचे ले जाएँ";
 "The sets you logged in this session will be lost." = "इस सत्र में दर्ज किए सेट खो जाएँगे।";
 "Last time: %@" = "पिछली बार: %@";
+"Record here" = "यहाँ रिकॉर्ड करें";
+"Let another app record" = "किसी और ऐप को रिकॉर्ड करने दें";
+"Recording in another app" = "दूसरे ऐप में रिकॉर्ड हो रहा है";
 "Recent" = "हाल के";
 "No workout running" = "कोई वर्कआउट नहीं चल रहा";
 "Start one on your iPhone and it shows up here." = "iPhone पर एक शुरू करें, यह यहाँ दिखेगा।";

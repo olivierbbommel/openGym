@@ -48,6 +48,9 @@
 "Move down" = "아래로 이동";
 "The sets you logged in this session will be lost." = "이 세션에서 기록한 세트가 사라집니다.";
 "Last time: %@" = "지난번: %@";
+"Record here" = "여기서 기록";
+"Let another app record" = "다른 앱이 기록하도록";
+"Recording in another app" = "다른 앱에서 기록 중";
 "Recent" = "최근";
 "No workout running" = "진행 중인 운동이 없어요";
 "Start one on your iPhone and it shows up here." = "iPhone에서 시작하면 여기에 나타나요.";

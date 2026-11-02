@@ -48,6 +48,9 @@
 "Move down" = "Sposta giù";
 "The sets you logged in this session will be lost." = "Le serie registrate in questa sessione andranno perse.";
 "Last time: %@" = "L'ultima volta: %@";
+"Record here" = "Registra qui";
+"Let another app record" = "Lascia registrare un’altra app";
+"Recording in another app" = "Registrato in un’altra app";
 "Recent" = "Recenti";
 "No workout running" = "Nessun allenamento in corso";
 "Start one on your iPhone and it shows up here." = "Avviane uno sull’iPhone e comparirà qui.";

@@ -48,6 +48,9 @@
 "Move down" = "Lejjebb";
 "The sets you logged in this session will be lost." = "Az ebben az edzésben rögzített sorozatok elvesznek.";
 "Last time: %@" = "Legutóbb: %@";
+"Record here" = "Rögzítés itt";
+"Let another app record" = "Más app rögzítsen";
+"Recording in another app" = "Másik app rögzíti";
 "Recent" = "Legutóbbiak";
 "No workout running" = "Nincs folyamatban edzés";
 "Start one on your iPhone and it shows up here." = "Indíts egyet az iPhone-on, és itt megjelenik.";

@@ -146,7 +146,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
                 workoutSeenAt = w.start.map { Date(timeIntervalSince1970: $0 / 1000) }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
                     guard let self = self, self.state.workout?.id == w.id else { return }
-                    self.health.start(workoutId: w.id)
+                    self.health.start(workoutId: w.id, trigger: .activation)
                 }
             }
         }
@@ -295,7 +295,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
                 self.workoutSeenAt = Date()
                 self.picked = [:]
                 self.summary = nil
-                self.health.start(workoutId: next.workout?.id)
+                self.health.start(workoutId: next.workout?.id, trigger: .pickedUp)
             }
             if let rest = snap.active?.rest, next.workout?.id == snap.active?.id {
                 let end = Date(timeIntervalSince1970: rest.endsAt / 1000)

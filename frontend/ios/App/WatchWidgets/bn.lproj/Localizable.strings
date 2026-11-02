@@ -48,6 +48,9 @@
 "Move down" = "নিচে সরান";
 "The sets you logged in this session will be lost." = "এই সেশনে লগ করা সেটগুলো হারিয়ে যাবে।";
 "Last time: %@" = "গতবার: %@";
+"Record here" = "এখানে রেকর্ড করুন";
+"Let another app record" = "অন্য অ্যাপকে রেকর্ড করতে দিন";
+"Recording in another app" = "অন্য অ্যাপে রেকর্ড হচ্ছে";
 "Recent" = "সাম্প্রতিক";
 "No workout running" = "কোনো ওয়ার্কআউট চলছে না";
 "Start one on your iPhone and it shows up here." = "iPhone-এ একটি শুরু করুন, এখানে দেখা যাবে।";

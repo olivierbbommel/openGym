@@ -48,6 +48,9 @@
 "Move down" = "تحريك لأسفل";
 "The sets you logged in this session will be lost." = "ستُفقد المجموعات التي سجلتها في هذه الجلسة.";
 "Last time: %@" = "المرة السابقة: %@";
+"Record here" = "سجّل هنا";
+"Let another app record" = "دع تطبيقًا آخر يسجّل";
+"Recording in another app" = "يُسجَّل في تطبيق آخر";
 "Recent" = "الأخيرة";
 "No workout running" = "لا يوجد تمرين جارٍ";
 "Start one on your iPhone and it shows up here." = "ابدأ تمرينًا على iPhone وسيظهر هنا.";

@@ -48,6 +48,9 @@
 "Move down" = "下移";
 "The sets you logged in this session will be lost." = "本次记录的组数将丢失。";
 "Last time: %@" = "上次: %@";
+"Record here" = "在此记录";
+"Let another app record" = "让其他 App 记录";
+"Recording in another app" = "正在其他 App 中记录";
 "Recent" = "最近";
 "No workout running" = "没有进行中的训练";
 "Start one on your iPhone and it shows up here." = "在 iPhone 上开始，它就会出现在这里。";

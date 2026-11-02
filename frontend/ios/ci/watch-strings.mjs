@@ -74,6 +74,17 @@ const COMPOSED = { 'Last time: %@': ['Last time', w => `${w}: %@`] }
 
 // Only the watch says these. %@ is a name, %lld a number, as the Swift source interpolates them.
 const OWN = {
+  // One workout session at a time on the watch (WatchCore SessionPolicy).
+  'Record here': {
+    de: 'Hier aufzeichnen', fr: 'Enregistrer ici', es: 'Registrar aquí', it: 'Registra qui', 'pt-PT': 'Registar aqui', 'pt-BR': 'Registrar aqui', pl: 'Rejestruj tutaj', hu: 'Rögzítés itt', tr: 'Burada kaydet', ru: 'Записывать здесь', uk: 'Записувати тут', ar: 'سجّل هنا', hi: 'यहाँ रिकॉर्ड करें', bn: 'এখানে রেকর্ড করুন', th: 'บันทึกที่นี่', ko: '여기서 기록', 'zh-Hans': '在此记录', 'zh-Hant': '在此記錄',
+  },
+  'Let another app record': {
+    de: 'Andere App aufzeichnen lassen', fr: 'Laisser une autre app enregistrer', es: 'Dejar que otra app registre', it: 'Lascia registrare un’altra app', 'pt-PT': 'Deixar outra app registar', 'pt-BR': 'Deixar outro app registrar', pl: 'Pozwól innej aplikacji rejestrować', hu: 'Más app rögzítsen', tr: 'Başka uygulama kaydetsin', ru: 'Пусть записывает другое приложение', uk: 'Нехай записує інша програма', ar: 'دع تطبيقًا آخر يسجّل', hi: 'किसी और ऐप को रिकॉर्ड करने दें', bn: 'অন্য অ্যাপকে রেকর্ড করতে দিন', th: 'ให้แอปอื่นบันทึก', ko: '다른 앱이 기록하도록', 'zh-Hans': '让其他 App 记录', 'zh-Hant': '讓其他 App 記錄',
+  },
+  'Recording in another app': {
+    de: 'Wird in anderer App aufgezeichnet', fr: 'Enregistré dans une autre app', es: 'Se registra en otra app', it: 'Registrato in un’altra app', 'pt-PT': 'A registar noutra app', 'pt-BR': 'Registrando em outro app', pl: 'Rejestrowane w innej aplikacji', hu: 'Másik app rögzíti', tr: 'Başka uygulamada kaydediliyor', ru: 'Записывается в другом приложении', uk: 'Записується в іншій програмі', ar: 'يُسجَّل في تطبيق آخر', hi: 'दूसरे ऐप में रिकॉर्ड हो रहा है', bn: 'অন্য অ্যাপে রেকর্ড হচ্ছে', th: 'กำลังบันทึกในแอปอื่น', ko: '다른 앱에서 기록 중', 'zh-Hans': '正在其他 App 中记录', 'zh-Hant': '正在其他 App 中記錄',
+  },
+
   // The exercises done lately, at the top of the watch's list to add or swap in.
   'Recent': {
     de: 'Zuletzt', fr: 'Récents', es: 'Recientes', it: 'Recenti', 'pt-PT': 'Recentes', 'pt-BR': 'Recentes', pl: 'Ostatnie',
