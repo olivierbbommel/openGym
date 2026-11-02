@@ -91,6 +91,23 @@ describe('the Done taps', () => {
     expect(L.applyLiveEvents([ev('e2')], getState)).toEqual(['e2'])
     expect(calls).toEqual([])
   })
+  it('+15 s and Skip on the activity move the rest here, which the watch then follows', () => {
+    const addRest = vi.fn(), stopRest = vi.fn()
+    let timer = { endsAt: 9e12, left: 60, total: 90 }
+    const ui = { getState: () => ({ timer, addRest, stopRest }) }
+    const rest = (id, type, over = {}) => ({ id, type, wid: 'w1', at: 1, ...over })
+    expect(L.applyLiveEvents([rest('r1', 'restAdd', { sec: 15 }), rest('r2', 'restSkip')], getState, ui)).toEqual(['r1', 'r2'])
+    expect(addRest).toHaveBeenCalledWith(15)
+    expect(stopRest).toHaveBeenCalledTimes(1)
+    // a rest that is over already, or another workout's: nothing to move, done with all the same
+    timer = null
+    expect(L.applyLiveEvents([rest('r3', 'restSkip'), rest('r4', 'restAdd', { wid: 'old' })], getState, ui)).toEqual(['r3', 'r4'])
+    expect(stopRest).toHaveBeenCalledTimes(1)
+    expect(addRest).toHaveBeenCalledTimes(1)
+  })
+  it('names the Skip button in the app\'s language', () => {
+    expect(L.buildLiveActivity(S(A())).attributes.labels.skip).toBeTruthy()
+  })
   it('keeps the events queued, in order, until the workout screen is there', () => {
     expect(L.applyLiveEvents([ev('e1'), ev('e2', { setIdx: 1 })], getState)).toEqual([])
     bind()

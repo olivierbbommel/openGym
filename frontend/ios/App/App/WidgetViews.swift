@@ -397,6 +397,49 @@ struct LiveRest: View {
     }
 }
 
+/// During a rest: +15 s and Skip (AddRestIntent, SkipRestIntent); during a set: Done.
+@available(iOS 17.0, *)
+struct LiveActions: View {
+    let attributes: WorkoutActivityAttributes
+    let state: WorkoutActivityAttributes.ContentState
+
+    var body: some View {
+        if state.restRange != nil {
+            HStack(spacing: 6) {
+                Button(intent: AddRestIntent(wid: attributes.wid)) {
+                    Text(verbatim: "+15 s").font(.subheadline.weight(.semibold)).monospacedDigit()
+                }
+                .buttonStyle(.bordered)
+                Button(intent: SkipRestIntent(wid: attributes.wid)) {
+                    Label(attributes.labels.skip ?? "Skip", systemImage: "forward.end.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color(hex: attributes.ink) ?? .black)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Color(hex: attributes.accent) ?? .green)
+            }
+        } else if let c = state.cur {
+            LiveDoneButton(attributes: attributes, cur: c)
+        }
+    }
+}
+
+/// The set the lines describe: during a rest it is the one up next ("Up next: Lat pulldown").
+@available(iOS 17.0, *)
+struct LiveSetTitle: View {
+    let attributes: WorkoutActivityAttributes
+    let state: WorkoutActivityAttributes.ContentState
+    var font: Font = .headline
+
+    var body: some View {
+        if let c = state.cur, state.restRange != nil || state.restLeft != nil {
+            (Text(attributes.labels.next + " ").foregroundStyle(.secondary) + Text(c.exName)).font(font).lineLimit(1)
+        } else {
+            Text(state.cur?.exName ?? attributes.labels.allDone).font(font).lineLimit(1)
+        }
+    }
+}
+
 @available(iOS 17.0, *)
 struct LiveDoneButton: View {
     let attributes: WorkoutActivityAttributes
@@ -424,7 +467,7 @@ struct LiveLockView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(state.cur?.exName ?? attributes.labels.allDone).font(.headline).lineLimit(1)
+                    LiveSetTitle(attributes: attributes, state: state)
                     if let c = state.cur {
                         Text([c.setLine, c.target].filter { !$0.isEmpty }.joined(separator: " · "))
                             .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
@@ -443,7 +486,7 @@ struct LiveLockView: View {
             HStack(spacing: 10) {
                 ProgressBar(value: Double(state.done) / Double(max(1, state.total)), accent: accent)
                 Text("\(state.done)/\(state.total)").font(.caption.weight(.semibold)).monospacedDigit().foregroundStyle(.secondary)
-                if let c = state.cur { LiveDoneButton(attributes: attributes, cur: c) }
+                LiveActions(attributes: attributes, state: state)
             }
         }
         .padding(16)

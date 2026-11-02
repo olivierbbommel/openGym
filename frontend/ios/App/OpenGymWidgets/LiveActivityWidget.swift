@@ -17,10 +17,13 @@ struct WorkoutLiveActivity: Widget {
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(context.state.cur?.exName ?? context.attributes.labels.allDone)
-                            .font(.headline).lineLimit(1)
+                        LiveSetTitle(attributes: context.attributes, state: context.state)
                         if let c = context.state.cur {
-                            Text(c.setLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            // During a set the target stands on the right; during a rest the right is
+                            // the countdown, and the set up next says its weight × reps here.
+                            let resting = context.state.restRange != nil || context.state.restLeft != nil
+                            Text(resting ? [c.setLine, c.target].filter { !$0.isEmpty }.joined(separator: " · ") : c.setLine)
+                                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         }
                     }
                     .padding(.leading, 4)
@@ -38,7 +41,7 @@ struct WorkoutLiveActivity: Widget {
                     HStack(spacing: 10) {
                         ProgressBar(value: Double(context.state.done) / Double(max(1, context.state.total)), accent: accent)
                         Text("\(context.state.done)/\(context.state.total)").font(.caption.weight(.semibold)).monospacedDigit()
-                        if let c = context.state.cur { LiveDoneButton(attributes: context.attributes, cur: c) }
+                        LiveActions(attributes: context.attributes, state: context.state)
                     }
                 }
             } compactLeading: {

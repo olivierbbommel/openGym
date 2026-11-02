@@ -72,6 +72,8 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     @Published private(set) var clips: [String: ClipFrames] = [:]
     /// What happened to the animations, newest last (the hidden debug screen).
     @Published private(set) var clipLog: [String] = []
+    /// The end of the last rest the phone sent, to tell its Skip from a rest the watch started.
+    private var phoneRestEnd: Date?
     @Published var weight: Double = 0 { didSet { if weight != oldValue { ackRestOver() } } }
     @Published var reps: Double = 0 { didSet { if reps != oldValue { ackRestOver() } } }
     /// A hold's seconds, for the set up next (the crown turns it).
@@ -214,6 +216,8 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     var widgetState: WidgetState {
         var w = widgetStateWithoutLang
         w.lang = state.settings.lang
+        // The phone confirmed this workout (it is no longer only started here) and is in reach.
+        w.phoneLive = workout != nil && state.startedHere == nil && reachable
         return w
     }
 
@@ -299,7 +303,13 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             }
             if let rest = snap.active?.rest, next.workout?.id == snap.active?.id {
                 let end = Date(timeIntervalSince1970: rest.endsAt / 1000)
+                self.phoneRestEnd = end
                 if end != self.restEndsAt { self.startRest(until: end, notify: true) }
+            } else if let sent = self.phoneRestEnd, next.workout != nil, snap.active != nil {
+                // The phone's rest is over before its end (Skip, on the phone or its Live Activity):
+                // the rest it had sent ends here too. A rest the watch started itself is left alone.
+                self.phoneRestEnd = nil
+                if self.restEndsAt == sent, sent > Date() { self.skipRest() }
             }
             self.health.syncSetting(next.settings.health)
             self.removeDeletedFromHealth(snap.healthGone)

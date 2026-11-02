@@ -28,6 +28,8 @@ struct WorkoutActivityAttributes: ActivityAttributes {
         var next: String
         var allDone: String
         var restOver: String
+        /// Skip, for the rest's button (an activity started by an older app has none: "Skip").
+        var skip: String?
     }
 
     /// One set as the activity shows it, with the rest that follows it.
@@ -144,6 +146,40 @@ struct DoneSetIntent: LiveActivityIntent {
     }
 }
 
+/// +15 s on a running rest, from the Lock Screen or the Dynamic Island, with the phone locked.
+@available(iOS 17.0, *)
+struct AddRestIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "+15 s"
+    static let isDiscoverable = false
+
+    @Parameter(title: "Workout") var wid: String
+
+    init() {}
+    init(wid: String) { self.wid = wid }
+
+    func perform() async throws -> some IntentResult {
+        await LiveActivityTick.addRest(wid: wid, seconds: 15)
+        return .result()
+    }
+}
+
+/// Skip a running rest, from the Lock Screen or the Dynamic Island, with the phone locked.
+@available(iOS 17.0, *)
+struct SkipRestIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Skip"
+    static let isDiscoverable = false
+
+    @Parameter(title: "Workout") var wid: String
+
+    init() {}
+    init(wid: String) { self.wid = wid }
+
+    func perform() async throws -> some IntentResult {
+        await LiveActivityTick.skipRest(wid: wid)
+        return .result()
+    }
+}
+
 @available(iOS 17.0, *)
 enum LiveActivityTick {
     static let restRequestId = "opengym.rest"   // RestAlertPlugin.requestId: the page's own replaces it
@@ -190,6 +226,45 @@ enum LiveActivityTick {
         }
         await activity.update(ActivityContent(state: next, staleDate: nil))
         NotificationCenter.default.post(name: LiveActivityQueue.didChange, object: nil)
+    }
+
+    /**
+     * The rest moved on (+15 s) or ended (Skip) from the activity's buttons: the activity shows it
+     * at once, the rest-over alert this phone has booked follows (moved, or taken back), and the
+     * page hears of it from the queue (restAdd, restSkip) when it is back, as for Done. Its rest
+     * then goes to the watch with its next snapshot, so the watch's rest follows too.
+     */
+    static func addRest(wid: String, seconds: Int, now: Date = Date()) async {
+        guard let activity = Activity<WorkoutActivityAttributes>.activities.first(where: { $0.attributes.wid == wid }) else { return }
+        var next = activity.content.state
+        guard let endMs = next.restEndsAt else { return }
+        let end = Date(timeIntervalSince1970: endMs / 1000).addingTimeInterval(TimeInterval(seconds))
+        next.restEndsAt = end.timeIntervalSince1970 * 1000
+        next.restTotal = (next.restTotal ?? 0) + Double(seconds)
+        LiveActivityQueue.append(["id": UUID().uuidString, "type": "restAdd", "wid": wid, "sec": seconds,
+                                  "at": (now.timeIntervalSince1970 * 1000).rounded()])
+        if await restBooked() { bookRestOver(at: end, title: activity.attributes.labels.restOver) }
+        await activity.update(ActivityContent(state: next, staleDate: nil))
+        NotificationCenter.default.post(name: LiveActivityQueue.didChange, object: nil)
+    }
+
+    static func skipRest(wid: String, now: Date = Date()) async {
+        guard let activity = Activity<WorkoutActivityAttributes>.activities.first(where: { $0.attributes.wid == wid }) else { return }
+        var next = activity.content.state
+        guard next.restEndsAt != nil || next.restLeft != nil else { return }
+        next.restEndsAt = nil
+        next.restLeft = nil
+        next.restTotal = nil
+        LiveActivityQueue.append(["id": UUID().uuidString, "type": "restSkip", "wid": wid,
+                                  "at": (now.timeIntervalSince1970 * 1000).rounded()])
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [restRequestId])
+        await activity.update(ActivityContent(state: next, staleDate: nil))
+        NotificationCenter.default.post(name: LiveActivityQueue.didChange, object: nil)
+    }
+
+    /// Whether this phone has a rest-over alert booked (none while the watch runs the workout).
+    private static func restBooked() async -> Bool {
+        await UNUserNotificationCenter.current().pendingNotificationRequests().contains { $0.identifier == restRequestId }
     }
 
     private static func bookRestOver(at: Date, title: String) {

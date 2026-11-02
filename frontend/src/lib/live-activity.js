@@ -106,6 +106,7 @@ export function buildLiveActivity (S, timer = null) {
         next: t('Up next'),
         allDone: t('All sets done'),
         restOver: t('Rest’s over. Next set!'),
+        skip: t('Skip'),
       },
     },
     state: {
@@ -124,6 +125,9 @@ export function buildLiveActivity (S, timer = null) {
 /* ---------- applying the activity's events ---------- */
 
 let handlers = null   // the workout screen's: setDone
+// The rest, for the activity's +15 s and Skip (useUI's addRest and stopRest): bound by
+// startLiveActivitySync, or handed in by a test.
+let restUI = null
 const readApplied = () => { try { return JSON.parse(localStorage.getItem(APPLIED_KEY)) || [] } catch { return [] } }
 const writeApplied = ids => { try { localStorage.setItem(APPLIED_KEY, JSON.stringify(ids.slice(-APPLIED_MAX))) } catch { /* the queue's ack is what counts */ } }
 
@@ -137,7 +141,7 @@ function entryIndexOf (A, ev) {
  * now, applied before, or about a workout that is not running any more. Without the workout
  * screen's actions the run stops, and that event and the ones after it stay queued.
  */
-export function applyLiveEvents (events, getState) {
+export function applyLiveEvents (events, getState, ui = restUI) {
   if (!Array.isArray(events)) return []
   const applied = readApplied()
   const done = []
@@ -151,6 +155,15 @@ export function applyLiveEvents (events, getState) {
       const idx = entryIndexOf(A, ev)
       const set = idx >= 0 ? A.entries[idx].sets?.[ev.setIdx] : null
       if (set && !set.done) handlers.setDone(idx, ev.setIdx, { at: num(ev.at) })
+    } else if ((ev.type === 'restAdd' || ev.type === 'restSkip') && ours) {
+      // +15 s or Skip on the activity: the rest here follows, and with it the watch's (the next
+      // snapshot carries the rest). A rest that is over already has nothing to move.
+      const R = ui?.getState?.()
+      if (!R) break
+      if (R.timer && !R.timer.ready) {
+        if (ev.type === 'restAdd') R.addRest(Math.max(1, num(ev.sec) || 15))
+        else R.stopRest()
+      }
     }
     // Applied, or meaningless now (another workout, a set that is gone or already ticked).
     applied.push(ev.id)
@@ -212,6 +225,7 @@ export async function startLiveActivitySync ({ useStore, useUI }) {
   const p = await livePlugin()
   if (!p) return () => {}
   getStateRef = () => useStore.getState()
+  restUI = useUI
   let supported = false
   try { supported = !!(await p.LiveActivity.status())?.supported } catch { supported = false }
   let last = null, tm = null
@@ -252,4 +266,4 @@ export async function startLiveActivitySync ({ useStore, useUI }) {
 
 // Test seams.
 export function _setLivePluginForTest (plugin, getState) { pluginP = Promise.resolve(plugin ? { LiveActivity: plugin } : null); getStateRef = getState || null }
-export function _resetLiveActivity () { handlers = null; pluginP = null; getStateRef = null; draining = null }
+export function _resetLiveActivity () { handlers = null; pluginP = null; getStateRef = null; draining = null; restUI = null }
