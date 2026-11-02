@@ -24,6 +24,9 @@ struct WidgetState: Codable, Equatable {
     var updatedAt: Date = .distantPast
     /// The app's language (the phone's), so the complications speak it too.
     var lang: String?
+    /// The phone in reach runs this workout too: its Live Activity is in the Smart Stack, and the
+    /// watch's own card stays below it rather than saying the same thing twice.
+    var phoneLive: Bool = false
 
     static let idle = WidgetState(mode: "idle", title: "OliGym", detail: "", restEndsAt: nil)
     static let groupId = "group.com.olibos.opengym"
@@ -32,6 +35,7 @@ struct WidgetState: Codable, Equatable {
     static func == (a: WidgetState, b: WidgetState) -> Bool {
         a.mode == b.mode && a.title == b.title && a.detail == b.detail && a.restEndsAt == b.restEndsAt
             && a.done == b.done && a.total == b.total && a.setLabel == b.setLabel && a.lang == b.lang
+            && a.phoneLive == b.phoneLive
     }
 
     /// The state as written, unless it is about a session the watch app has not touched for 45
