@@ -13,7 +13,6 @@ import WidgetKit
 struct OpenGymWidgets: WidgetBundle {
     var body: some Widget {
         TodayWidget()
-        StreakWidget()
         WorkoutLiveActivity()
     }
 }
@@ -80,18 +79,8 @@ struct TodayWidget: Widget {
         }
         .configurationDisplayName("Today’s workout")
         .description("Your plan for today, the week ahead and your streak.")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryRectangular, .accessoryInline])
-    }
-}
-
-struct StreakWidget: Widget {
-    var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "OpenGymStreak", provider: SnapshotProvider()) { entry in
-            StreakCircleView(model: WidgetModel(snap: entry.snapshot, date: entry.date))
-                .containerBackground(for: .widget) { Color.clear }
-        }
-        .configurationDisplayName("Streak")
-        .description("Weeks in a row with a workout.")
-        .supportedFamilies([.accessoryCircular])
+        // The Lock Screen keeps the rectangle (today's workout); the one-line and the streak
+        // circle are gone (Olivier's pick, Nov 2 2026).
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryRectangular])
     }
 }
